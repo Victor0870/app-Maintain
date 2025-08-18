@@ -55,6 +55,9 @@ public class TaskUIManager
     private Transform _todayTasksListParent;
     private GameObject _newTasksPanel;
     private Transform _newTasksListParent;
+    
+    // Thêm tham chiếu đến panel công việc đang làm trên dashboard
+    private Transform _inProgressTasksListParent;
 
     // Các biến cho Popup Xác nhận
     private GameObject _confirmPopupPanel;
@@ -86,7 +89,7 @@ public class TaskUIManager
         Toggle detailsStatusToggle, TextMeshProUGUI detailsStatusToggleLabel, Button markAsDoneButton, Button materialsButton,
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
         GameObject todayTasksPanel, Transform todayTasksListParent, GameObject newTasksPanel, Transform newTasksListParent,
-        // Các tham số mới cho Popup
+        Transform inProgressTasksListParent, // Tham số mới
         GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton
     )
     {
@@ -114,6 +117,9 @@ public class TaskUIManager
         _todayTasksListParent = todayTasksListParent;
         _newTasksPanel = newTasksPanel;
         _newTasksListParent = newTasksListParent;
+        
+        // Gán tham chiếu mới
+        _inProgressTasksListParent = inProgressTasksListParent;
 
         // Gán các tham chiếu của Popup
         _confirmPopupPanel = confirmPopupPanel;
@@ -325,11 +331,22 @@ public class TaskUIManager
         }
     }
 
+    // Cập nhật hàm này để đặt filter mặc định là "Đang chờ"
     public void ToggleTaskListPanelVisibility()
     {
         if (_taskListPanel != null)
         {
             _taskListPanel.SetActive(!_taskListPanel.activeSelf);
+        }
+        if (_statusFilterDropdown != null)
+        {
+            // Tìm index của "Đang chờ" và đặt làm mặc định
+            int pendingIndex = _statusFilterDropdown.options.FindIndex(option => option.text == TaskConstants.STATUS_PENDING);
+            if (pendingIndex != -1)
+            {
+                _statusFilterDropdown.value = pendingIndex;
+                _statusFilterDropdown.RefreshShownValue();
+            }
         }
     }
 
@@ -414,11 +431,13 @@ public class TaskUIManager
         return TaskConstants.STATUS_ALL;
     }
 
-    public void UpdateAllTaskListsUI(List<Dictionary<string, object>> allTasks, List<Dictionary<string, object>> todayTasks, List<Dictionary<string, object>> newTasks)
+    // Cập nhật hàm này để xử lý 3 danh sách công việc riêng biệt
+    public void UpdateAllTaskListsUI(List<Dictionary<string, object>> allTasks, List<Dictionary<string, object>> todayTasks, List<Dictionary<string, object>> newTasks, List<Dictionary<string, object>> inProgressTasks)
     {
         ClearSpecificTasksUI(_tasksListParent);
         ClearSpecificTasksUI(_todayTasksListParent);
         ClearSpecificTasksUI(_newTasksListParent);
+        ClearSpecificTasksUI(_inProgressTasksListParent);
 
         foreach (var taskData in allTasks)
         {
@@ -433,6 +452,12 @@ public class TaskUIManager
         foreach (var taskData in newTasks)
         {
             DisplayTask(taskData, _newTasksListParent, true);
+        }
+        
+        // Hiển thị danh sách công việc đang làm trên dashboard
+        foreach (var taskData in inProgressTasks)
+        {
+            DisplayTask(taskData, _inProgressTasksListParent, false);
         }
     }
 

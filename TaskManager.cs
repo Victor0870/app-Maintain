@@ -51,6 +51,10 @@ public class TaskManager : MonoBehaviour
     public TextMeshProUGUI confirmPopupText;
     public Button confirmYesButton;
     public Button confirmNoButton;
+    
+    // Thêm tham chiếu mới cho danh sách công việc đang làm
+    [Header("UI Elements - Dashboard")]
+    public Transform inProgressTasksListParent;
 
     private TaskDataHandler _taskDataHandler;
     private TaskUIManager _taskUIManager;
@@ -73,10 +77,11 @@ public class TaskManager : MonoBehaviour
             addTaskButton, closeDetailsButton, sharedRiskToggles, notificationText,
             loadingIndicatorPanel, loadingPercentageText,
             showTaskListButton, taskListPanel, showInputPanelButton,
-            null, null, null, null, // Chú ý: đã bỏ detailsStatusToggle và các thành phần liên quan
+            null, null, null, null,
             statusFilterDropdown, tasksListParent, taskItemPrefab,
             todayTasksPanel, todayTasksListParent, newTasksPanel, newTasksListParent,
-            confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton // Truyền các biến popup mới
+            inProgressTasksListParent, // Tham số mới
+            confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton
         );
 
         _taskUIManager.OnAddTaskClicked += HandleAddTask;
@@ -99,7 +104,9 @@ public class TaskManager : MonoBehaviour
 
         _taskUIManager.InitializeUIState();
         _taskUIManager.InitializeSharedRiskTogglesLabels();
-        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+        
+        // Tải danh sách công việc đang làm ngay khi bắt đầu
+        _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_IN_PROGRESS);
     }
 
     void OnDestroy()
@@ -146,7 +153,8 @@ public class TaskManager : MonoBehaviour
     private void HandleShowTaskList()
     {
         _taskUIManager.ToggleTaskListPanelVisibility();
-        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+        // Tải danh sách công việc với bộ lọc mặc định là "Đang chờ"
+        _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
         _taskUIManager.ShowNotification("Thông báo", "Đang hiển thị danh sách công việc.");
     }
 
@@ -194,6 +202,10 @@ public class TaskManager : MonoBehaviour
             {
                 _taskUIManager.CloseTaskDetails();
             }
+            
+            // Yêu cầu TaskDataHandler tải lại cả hai danh sách sau khi cập nhật
+            _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
+            _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_IN_PROGRESS);
         }
         _tempNewStatus = null;
     }
@@ -203,7 +215,6 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.HideConfirmPopup();
         if (taskStatusController != null)
         {
-            // Quay lại trạng thái cũ của Toggle nếu người dùng không xác nhận
             taskStatusController.RevertToPreviousStatus();
         }
         _tempNewStatus = null;

@@ -43,7 +43,6 @@ public class TaskManager : MonoBehaviour
     public Button confirmYesButton;
     public Button confirmNoButton;
     
-    // Thêm tham chiếu mới cho danh sách công việc đang làm
     [Header("UI Elements - Dashboard")]
     public Transform inProgressTasksListParent;
 
@@ -67,8 +66,9 @@ public class TaskManager : MonoBehaviour
             mainTaskPanel, taskContentInput, taskLocationInput, taskDescriptionInput,
             addTaskButton, closeDetailsButton, sharedRiskToggles, notificationText,
             loadingIndicatorPanel, loadingPercentageText,
-            showTaskListButton, taskListPanel, showInputPanelButton,statusFilterDropdown, tasksListParent, taskItemPrefab,
-                        inProgressTasksListParent, // Tham số mới
+            showTaskListButton, taskListPanel, showInputPanelButton,
+            statusFilterDropdown, tasksListParent, taskItemPrefab,
+            inProgressTasksListParent,
             confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton
         );
 
@@ -86,15 +86,18 @@ public class TaskManager : MonoBehaviour
             taskStatusController.OnStatusChanged += HandleTaskStatusChanged;
         }
 
-        _taskDataHandler.OnTasksDataChanged += _taskUIManager.UpdateAllTaskListsUI;
+        // Đăng ký cho các sự kiện riêng
+        _taskDataHandler.OnFilteredTasksChanged += _taskUIManager.UpdateFilteredTasksUI;
+        _taskDataHandler.OnInProgressTasksChanged += _taskUIManager.UpdateInProgressTasksUI;
         _taskDataHandler.OnInitialLoadComplete += _taskUIManager.HideLoadingIndicator;
         _taskDataHandler.OnNewTaskAdded += _taskUIManager.ShowNewTaskNotification;
 
         _taskUIManager.InitializeUIState();
         _taskUIManager.InitializeSharedRiskTogglesLabels();
         
-        // Tải danh sách công việc đang làm ngay khi bắt đầu
-        _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_IN_PROGRESS);
+        // Tải danh sách công việc "Đang làm" và "Đang chờ" ngay khi bắt đầu
+        _taskDataHandler.StartListeningForInProgressTasks();
+        _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
     }
 
     void OnDestroy()
@@ -118,10 +121,12 @@ public class TaskManager : MonoBehaviour
 
         if (_taskDataHandler != null)
         {
-            _taskDataHandler.OnTasksDataChanged -= _taskUIManager.UpdateAllTaskListsUI;
+            _taskDataHandler.OnFilteredTasksChanged -= _taskUIManager.UpdateFilteredTasksUI;
+            _taskDataHandler.OnInProgressTasksChanged -= _taskUIManager.UpdateInProgressTasksUI;
             _taskDataHandler.OnInitialLoadComplete -= _taskUIManager.HideLoadingIndicator;
             _taskDataHandler.OnNewTaskAdded -= _taskUIManager.ShowNewTaskNotification;
-            _taskDataHandler.StopListeningForTasks();
+            _taskDataHandler.StopListeningForFilteredTasks();
+            _taskDataHandler.StopListeningForInProgressTasks();
         }
     }
 
@@ -141,10 +146,7 @@ public class TaskManager : MonoBehaviour
     private void HandleShowTaskList()
     {
         _taskUIManager.ToggleTaskListPanelVisibility();
-        // Tải danh sách công việc với bộ lọc mặc định là "Đang chờ"
-        _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
-        // Dashboard vẫn giữ danh sách đang làm riêng biệt
-        _taskUIManager.ShowNotification("Thông báo", "Đang hiển thị danh sách công việc.");
+        // Không cần gọi lại ở đây vì trạng thái mặc định đã được đặt trong Start()
     }
 
     private void HandleShowInputPanel()
@@ -155,17 +157,12 @@ public class TaskManager : MonoBehaviour
     private void HandleStatusFilterChange(int index)
     {
         _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
-        // Dashboard giữ nguyên danh sách đang làm, không bị ảnh hưởng
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
     {
         _currentSelectedTaskId = taskData.ContainsKey("id") ? taskData["id"].ToString() : null;
-        
-        // Cập nhật UI hiển thị chi tiết công việc
         _taskUIManager.ShowTaskDetails(taskData);
-        
-        // Cập nhật trạng thái của Toggle Group
         string currentStatus = taskData.TryGetValue("status", out object statusVal) ? statusVal.ToString() : TaskConstants.STATUS_PENDING;
         if (taskStatusController != null)
         {
@@ -176,7 +173,6 @@ public class TaskManager : MonoBehaviour
     private void HandleTaskStatusChanged(string newStatus)
     {
         _tempNewStatus = newStatus;
-        // Hiển thị popup xác nhận với thông điệp phù hợp
         _taskUIManager.ShowConfirmPopup($"Bạn có chắc chắn muốn thay đổi trạng thái công việc này thành '{_tempNewStatus}' không?");
     }
 
@@ -187,16 +183,10 @@ public class TaskManager : MonoBehaviour
         {
             _taskDataHandler.UpdateTaskStatus(_currentSelectedTaskId, _tempNewStatus);
             _taskUIManager.ShowNotification("Thành công", $"Trạng thái công việc đã được cập nhật thành '{_tempNewStatus}'!");
-
             if (_tempNewStatus == TaskConstants.STATUS_DONE)
             {
                 _taskUIManager.CloseTaskDetails();
             }
-            
-            // Yêu cầu TaskDataHandler tải lại cả hai danh sách sau khi cập nhật
-            _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
-        // Dashboard vẫn giữ danh sách đang làm riêng biệt
-            _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_IN_PROGRESS);
         }
         _tempNewStatus = null;
     }

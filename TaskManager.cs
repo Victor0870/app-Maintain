@@ -4,6 +4,7 @@ using TMPro;
 using Firebase.Extensions;
 using System.Collections;
 using System.Collections.Generic;
+using Firebase.Firestore;
 
 public class TaskManager : MonoBehaviour
 {
@@ -46,11 +47,15 @@ public class TaskManager : MonoBehaviour
     [Header("UI Elements - Dashboard")]
     public Transform inProgressTasksListParent;
 
+    [Header("UI Elements - Pagination")]
+    public Button loadMoreButton;
+
     private TaskDataHandler _taskDataHandler;
     private TaskUIManager _taskUIManager;
 
     private string _currentSelectedTaskId;
     private string _tempNewStatus;
+    private DocumentSnapshot _lastVisibleDocument;
 
     void Start()
     {
@@ -63,13 +68,15 @@ public class TaskManager : MonoBehaviour
 
         _taskDataHandler = new TaskDataHandler(FirebaseManager.Instance.db, FirebaseManager.Instance.GetCanvasAppId());
         _taskUIManager = new TaskUIManager(
-            this, mainTaskPanel, taskContentInput, taskLocationInput, taskDescriptionInput,
+            this,
+            mainTaskPanel, taskContentInput, taskLocationInput, taskDescriptionInput,
             addTaskButton, closeDetailsButton, sharedRiskToggles, notificationText,
             loadingIndicatorPanel, loadingPercentageText,
             showTaskListButton, taskListPanel, showInputPanelButton,
             statusFilterDropdown, tasksListParent, taskItemPrefab,
             inProgressTasksListParent,
-            confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton
+            confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton,
+            loadMoreButton
         );
 
         _taskUIManager.OnAddTaskClicked += HandleAddTask;
@@ -80,13 +87,14 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.OnTaskItemClicked += HandleTaskItemClick;
         _taskUIManager.OnConfirmYesClicked += HandleConfirmYesClick;
         _taskUIManager.OnConfirmNoClicked += HandleConfirmNoClick;
+        _taskUIManager.OnLoadMoreClicked += HandleLoadMoreTasks;
 
         if (taskStatusController != null)
         {
             taskStatusController.OnStatusChanged += HandleTaskStatusChanged;
         }
 
-        _taskDataHandler.OnFilteredTasksChanged += _taskUIManager.UpdateFilteredTasksUI;
+        _taskDataHandler.OnFilteredTasksLoaded += HandleFilteredTasksLoaded;
         _taskDataHandler.OnInProgressTasksChanged += _taskUIManager.UpdateInProgressTasksUI;
         _taskDataHandler.OnInitialLoadComplete += _taskUIManager.HideLoadingIndicator;
         _taskDataHandler.OnNewTaskAdded += _taskUIManager.ShowNewTaskNotification;
@@ -95,7 +103,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.InitializeSharedRiskTogglesLabels();
         
         _taskDataHandler.StartListeningForInProgressTasks();
-        _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
+        LoadInitialTasks();
     }
 
     void OnDestroy()
@@ -110,6 +118,7 @@ public class TaskManager : MonoBehaviour
             _taskUIManager.OnTaskItemClicked -= HandleTaskItemClick;
             _taskUIManager.OnConfirmYesClicked -= HandleConfirmYesClick;
             _taskUIManager.OnConfirmNoClicked -= HandleConfirmNoClick;
+            _taskUIManager.OnLoadMoreClicked -= HandleLoadMoreTasks;
         }
 
         if (taskStatusController != null)
@@ -119,13 +128,36 @@ public class TaskManager : MonoBehaviour
 
         if (_taskDataHandler != null)
         {
-            _taskDataHandler.OnFilteredTasksChanged -= _taskUIManager.UpdateFilteredTasksUI;
+            _taskDataHandler.OnFilteredTasksLoaded -= HandleFilteredTasksLoaded;
             _taskDataHandler.OnInProgressTasksChanged -= _taskUIManager.UpdateInProgressTasksUI;
             _taskDataHandler.OnInitialLoadComplete -= _taskUIManager.HideLoadingIndicator;
             _taskDataHandler.OnNewTaskAdded -= _taskUIManager.ShowNewTaskNotification;
-            _taskDataHandler.StopListeningForFilteredTasks();
             _taskDataHandler.StopListeningForInProgressTasks();
         }
+    }
+    
+    private void LoadInitialTasks()
+    {
+        _taskUIManager.ShowLoadingIndicator("Đang tải công việc...");
+        _taskUIManager.ClearFilteredTasksUI();
+        _lastVisibleDocument = null;
+        _taskDataHandler.LoadFilteredTasksAsync(_taskUIManager.GetSelectedStatusFilter(), _lastVisibleDocument);
+    }
+    
+    private void HandleFilteredTasksLoaded(List<Dictionary<string, object>> tasks, bool hasMore)
+    {
+        _taskUIManager.HideLoadingIndicator();
+        _taskUIManager.AppendFilteredTasksUI(tasks, hasMore);
+        if (tasks.Count > 0)
+        {
+            _lastVisibleDocument = (DocumentSnapshot)tasks[tasks.Count - 1]["documentSnapshot"];
+        }
+    }
+    
+    private void HandleLoadMoreTasks()
+    {
+        _taskUIManager.ShowLoadingIndicator("Đang tải thêm công việc...");
+        _taskDataHandler.LoadFilteredTasksAsync(_taskUIManager.GetSelectedStatusFilter(), _lastVisibleDocument);
     }
 
     private void HandleAddTask(string content, string location, string description, string[] selectedRisks)
@@ -144,6 +176,7 @@ public class TaskManager : MonoBehaviour
     private void HandleShowTaskList()
     {
         _taskUIManager.ToggleTaskListPanelVisibility();
+        LoadInitialTasks();
     }
 
     private void HandleShowInputPanel()
@@ -153,8 +186,7 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
-        _taskUIManager.ClearFilteredTasksUI();
-        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+        LoadInitialTasks();
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
@@ -179,19 +211,13 @@ public class TaskManager : MonoBehaviour
     {
         _taskUIManager.HideConfirmPopup();
         if (!string.IsNullOrEmpty(_currentSelectedTaskId) && !string.IsNullOrEmpty(_tempNewStatus))
-        {                                          
-            _taskUIManager.ClearInProgressTasksUI();
+        {
             _taskDataHandler.UpdateTaskStatus(_currentSelectedTaskId, _tempNewStatus);
             _taskUIManager.ShowNotification("Thành công", $"Trạng thái công việc đã được cập nhật thành '{_tempNewStatus}'!");
-
             if (_tempNewStatus == TaskConstants.STATUS_DONE)
             {
                 _taskUIManager.CloseTaskDetails();
             }
-
-            _taskDataHandler.StartListeningForInProgressTasks();
-            _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
-
         }
         _tempNewStatus = null;
     }

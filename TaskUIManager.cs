@@ -66,12 +66,14 @@ public class TaskUIManager
     public event Action OnMarkAsDoneClicked;
     public event Action OnMaterialsClicked;
     public event Action<int> OnStatusFilterChanged;
+    public event Action OnLoadMoreClicked;
     public event Action<Dictionary<string, object>> OnTaskItemClicked;
 
     public event Action OnConfirmYesClicked;
     public event Action OnConfirmNoClicked;
 
     private MonoBehaviour _monoBehaviourContext;
+    private Button _loadMoreButton;
 
     public TaskUIManager(
         TaskManager monoBehaviourContext,
@@ -81,7 +83,8 @@ public class TaskUIManager
         Button showTaskListButton, GameObject taskListPanel, Button showInputPanelButton,
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
         Transform inProgressTasksListParent,
-        GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton
+        GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton,
+        Button loadMoreButton
     )
     {
         _mainTaskPanel = mainTaskPanel;
@@ -105,6 +108,7 @@ public class TaskUIManager
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
+        _loadMoreButton = loadMoreButton;
         
         _monoBehaviourContext = monoBehaviourContext;
 
@@ -148,6 +152,8 @@ public class TaskUIManager
 
         if (_confirmYesButton != null) _confirmYesButton.onClick.AddListener(() => OnConfirmYesClicked?.Invoke());
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(() => OnConfirmNoClicked?.Invoke());
+
+        if (_loadMoreButton != null) _loadMoreButton.onClick.AddListener(() => OnLoadMoreClicked?.Invoke());
     }
 
     public void InitializeUIState()
@@ -396,12 +402,22 @@ public class TaskUIManager
         return TaskConstants.STATUS_ALL;
     }
 
-    public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks)
+    public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks, bool hasMore)
     {
         ClearSpecificTasksUI(_tasksListParent);
-        foreach (var taskData in filteredTasks)
+        AppendFilteredTasksUI(filteredTasks, hasMore);
+    }
+    
+    public void AppendFilteredTasksUI(List<Dictionary<string, object>> tasks, bool hasMore)
+    {
+        foreach (var taskData in tasks)
         {
             DisplayTask(taskData, _tasksListParent, false);
+        }
+
+        if (_loadMoreButton != null)
+        {
+            _loadMoreButton.gameObject.SetActive(hasMore);
         }
     }
 

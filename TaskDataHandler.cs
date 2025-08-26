@@ -10,10 +10,9 @@ public class TaskDataHandler
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
     private ListenerRegistration _tasksListener;
-    private ListenerRegistration _inProgressTasksListener; // Listener mới cho danh sách "Đang làm"
+    private ListenerRegistration _inProgressTasksListener;
     private bool _initialLoadComplete = false;
 
-    // Delegate mới cho sự kiện riêng
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
     public event Action OnInitialLoadComplete;
@@ -66,7 +65,6 @@ public class TaskDataHandler
                 OnInitialLoadComplete?.Invoke();
             }
 
-            // Gửi thông báo cho công việc mới nếu có
             foreach (DocumentChange change in snapshot.GetChanges())
             {
                 if (change.ChangeType == DocumentChange.Type.Added)
@@ -80,7 +78,6 @@ public class TaskDataHandler
         });
     }
 
-    // Phương thức lắng nghe riêng cho danh sách "Đang làm"
     public void StartListeningForInProgressTasks()
     {
         if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
@@ -133,13 +130,77 @@ public class TaskDataHandler
         }
     }
 
-    public void AddTask(string content, string location, string description, string[] selectedRisks, string createdBy)
+    public async void AddTask(string content, string location, string description, string[] selectedRisks, string createdBy)
     {
-        // ... (Giữ nguyên)
+        if (string.IsNullOrEmpty(content) || string.IsNullOrEmpty(location) || string.IsNullOrEmpty(description))
+        {
+            Debug.LogWarning("Content, Location, and Description cannot be empty.");
+            return;
+        }
+
+        if (_db == null)
+        {
+            Debug.LogError("Firebase not initialized in TaskDataHandler.");
+            return;
+        }
+
+        Dictionary<string, object> taskData = new Dictionary<string, object>
+        {
+            { "content", content },
+            { "location", location },
+            { "description", description },
+            { "timestamp", FieldValue.ServerTimestamp },
+            { "createdBy", createdBy },
+            { "risks", selectedRisks },
+            { "status", TaskConstants.STATUS_PENDING }
+        };
+
+        try
+        {
+            CollectionReference tasksCollectionRef = _db.Collection("artifacts")
+                .Document(_canvasAppId)
+                .Collection("public")
+                .Document("data")
+                .Collection("tasks");
+
+            await tasksCollectionRef.AddAsync(taskData);
+            Debug.Log("Task added successfully to Firestore!");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error adding task to Firestore: " + ex.Message);
+        }
     }
 
-    public void UpdateTaskStatus(string taskId, string newStatus)
+    public async void UpdateTaskStatus(string taskId, string newStatus)
     {
-        // ... (Giữ nguyên)
+        if (_db == null || string.IsNullOrEmpty(taskId))
+        {
+            Debug.LogError("Firestore DB hoặc Task ID không hợp lệ để cập nhật trạng thái.");
+            return;
+        }
+
+        DocumentReference taskDocRef = _db.Collection("artifacts")
+            .Document(_canvasAppId)
+            .Collection("public")
+            .Document("data")
+            .Collection("tasks")
+            .Document(taskId);
+
+        Dictionary<string, object> updates = new Dictionary<string, object>
+        {
+            { "status", newStatus },
+            { "lastUpdated", FieldValue.ServerTimestamp }
+        };
+
+        try
+        {
+            await taskDocRef.UpdateAsync(updates);
+            Debug.Log($"Trạng thái công việc {taskId} đã được cập nhật thành '{newStatus}' thành công.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Lỗi khi cập nhật trạng thái công việc {taskId}: {ex.Message}");
+        }
     }
 }

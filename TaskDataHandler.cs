@@ -9,10 +9,9 @@ public class TaskDataHandler
 {
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
-    private ListenerRegistration _inProgressTasksListener; // Giữ nguyên listener này
+    private ListenerRegistration _inProgressTasksListener;
     private bool _initialLoadComplete = false;
 
-    // Delegate cho sự kiện tải trang
     public event Action<List<Dictionary<string, object>>, bool> OnFilteredTasksLoaded;
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action OnInitialLoadComplete;
@@ -116,7 +115,7 @@ public class TaskDataHandler
         }
     }
     
-    public async void AddTask(string content, string location, string description, string[] selectedRisks, string createdBy)
+    public async Task AddTask(string content, string location, string description, string[] selectedRisks, string createdBy)
     {
         if (string.IsNullOrEmpty(content) || string.IsNullOrEmpty(location) || string.IsNullOrEmpty(description))
         {
@@ -158,7 +157,7 @@ public class TaskDataHandler
         }
     }
 
-    public async void UpdateTaskStatus(string taskId, string newStatus)
+    public async Task UpdateTaskStatus(string taskId, string newStatus)
     {
         if (_db == null || string.IsNullOrEmpty(taskId))
         {

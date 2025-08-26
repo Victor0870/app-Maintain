@@ -74,6 +74,7 @@ public class TaskUIManager
     private MonoBehaviour _monoBehaviourContext;
 
     public TaskUIManager(
+        TaskManager monoBehaviourContext,
         GameObject mainTaskPanel, TMP_InputField taskContentInput, TMP_InputField taskLocationInput, TMP_InputField taskDescriptionInput,
         Button addTaskButton, Button closeDetailsButton, Toggle[] sharedRiskToggles, TextMeshProUGUI notificationText,
         GameObject loadingIndicatorPanel, TextMeshProUGUI loadingPercentageText,
@@ -104,12 +105,8 @@ public class TaskUIManager
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
-
-        _monoBehaviourContext = mainTaskPanel.GetComponentInParent<TaskManager>();
-        if (_monoBehaviourContext == null)
-        {
-            Debug.LogError("TaskUIManager needs a MonoBehaviour context to run coroutines. Please ensure TaskManager or another MonoBehaviour is active.");
-        }
+        
+        _monoBehaviourContext = monoBehaviourContext;
 
         SetupUIListeners();
     }

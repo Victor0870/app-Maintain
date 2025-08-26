@@ -36,16 +36,7 @@ public class TaskManager : MonoBehaviour
     public TaskStatusController taskStatusController;
 
     [Header("UI Elements - Task List Filtering")]
-    public TMP_Dropdown statusFilterDropdown;
-
-    [Header("UI Elements - Today's Tasks Panel")]
-    public GameObject todayTasksPanel;
-    public Transform todayTasksListParent;
-
-    [Header("UI Elements - New Tasks Panel")]
-    public GameObject newTasksPanel;
-    public Transform newTasksListParent;
-
+    public TMP_Dropdown statusFilterDropdown;                
     [Header("UI Elements - Confirmation Popup")]
     public GameObject confirmPopupPanel;
     public TextMeshProUGUI confirmPopupText;
@@ -76,11 +67,8 @@ public class TaskManager : MonoBehaviour
             mainTaskPanel, taskContentInput, taskLocationInput, taskDescriptionInput,
             addTaskButton, closeDetailsButton, sharedRiskToggles, notificationText,
             loadingIndicatorPanel, loadingPercentageText,
-            showTaskListButton, taskListPanel, showInputPanelButton,
-            null, null, null, null,
-            statusFilterDropdown, tasksListParent, taskItemPrefab,
-            todayTasksPanel, todayTasksListParent, newTasksPanel, newTasksListParent,
-            inProgressTasksListParent, // Tham số mới
+            showTaskListButton, taskListPanel, showInputPanelButton,statusFilterDropdown, tasksListParent, taskItemPrefab,
+                        inProgressTasksListParent, // Tham số mới
             confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton
         );
 
@@ -155,6 +143,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.ToggleTaskListPanelVisibility();
         // Tải danh sách công việc với bộ lọc mặc định là "Đang chờ"
         _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
+        // Dashboard vẫn giữ danh sách đang làm riêng biệt
         _taskUIManager.ShowNotification("Thông báo", "Đang hiển thị danh sách công việc.");
     }
 
@@ -166,6 +155,7 @@ public class TaskManager : MonoBehaviour
     private void HandleStatusFilterChange(int index)
     {
         _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+        // Dashboard giữ nguyên danh sách đang làm, không bị ảnh hưởng
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
@@ -205,6 +195,7 @@ public class TaskManager : MonoBehaviour
             
             // Yêu cầu TaskDataHandler tải lại cả hai danh sách sau khi cập nhật
             _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_PENDING);
+        // Dashboard vẫn giữ danh sách đang làm riêng biệt
             _taskDataHandler.StartListeningForTasks(TaskConstants.STATUS_IN_PROGRESS);
         }
         _tempNewStatus = null;

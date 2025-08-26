@@ -51,8 +51,8 @@ public class TaskUIManager
 
     private TMP_Dropdown _statusFilterDropdown;
 
-    private GameObject _todayTasksPanel;
-    private Transform _todayTasksListParent;
+    //private GameObject _todayTasksPanel;
+    //private Transform _todayTasksListParent;
     private GameObject _newTasksPanel;
     private Transform _newTasksListParent;
     
@@ -88,7 +88,8 @@ public class TaskUIManager
         Button showTaskListButton, GameObject taskListPanel, Button showInputPanelButton,
         Toggle detailsStatusToggle, TextMeshProUGUI detailsStatusToggleLabel, Button markAsDoneButton, Button materialsButton,
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
-        GameObject todayTasksPanel, Transform todayTasksListParent, GameObject newTasksPanel, Transform newTasksListParent,
+        //GameObject todayTasksPanel, Transform todayTasksListParent, 
+        //GameObject newTasksPanel, Transform newTasksListParent,
         Transform inProgressTasksListParent, // Tham số mới
         GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton
     )
@@ -113,10 +114,10 @@ public class TaskUIManager
         _statusFilterDropdown = statusFilterDropdown;
         _tasksListParent = tasksListParent;
         _taskItemPrefab = taskItemPrefab;
-        _todayTasksPanel = todayTasksPanel;
-        _todayTasksListParent = todayTasksListParent;
-        _newTasksPanel = newTasksPanel;
-        _newTasksListParent = newTasksListParent;
+        //_todayTasksPanel = todayTasksPanel;
+        //_todayTasksListParent = todayTasksListParent;
+       // _newTasksPanel = newTasksPanel;
+       // _newTasksListParent = newTasksListParent;
         
         // Gán tham chiếu mới
         _inProgressTasksListParent = inProgressTasksListParent;
@@ -185,8 +186,8 @@ public class TaskUIManager
         if (_taskListPanel != null) _taskListPanel.SetActive(false);
         if (_loadingIndicatorPanel != null) _loadingIndicatorPanel.SetActive(false);
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
-        if (_todayTasksPanel != null) _todayTasksPanel.SetActive(true);
-        if (_newTasksPanel != null) _newTasksPanel.SetActive(true);
+       // if (_todayTasksPanel != null) _todayTasksPanel.SetActive(true);
+       // if (_newTasksPanel != null) _newTasksPanel.SetActive(true);
         
         // Ẩn Popup khi khởi tạo
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
@@ -435,8 +436,8 @@ public class TaskUIManager
     public void UpdateAllTaskListsUI(List<Dictionary<string, object>> allTasks, List<Dictionary<string, object>> todayTasks, List<Dictionary<string, object>> newTasks, List<Dictionary<string, object>> inProgressTasks)
     {
         ClearSpecificTasksUI(_tasksListParent);
-        ClearSpecificTasksUI(_todayTasksListParent);
-        ClearSpecificTasksUI(_newTasksListParent);
+        //ClearSpecificTasksUI(_todayTasksListParent);
+        //ClearSpecificTasksUI(_newTasksListParent);
         ClearSpecificTasksUI(_inProgressTasksListParent);
 
         foreach (var taskData in allTasks)
@@ -444,17 +445,24 @@ public class TaskUIManager
             DisplayTask(taskData, _tasksListParent, false);
         }
 
-        foreach (var taskData in todayTasks)
-        {
-            DisplayTask(taskData, _todayTasksListParent, true);
-        }
+        //foreach (var taskData in todayTasks)
+        //{
+       //     DisplayTask(taskData, _todayTasksListParent, true);
+      //  }
 
-        foreach (var taskData in newTasks)
-        {
-            DisplayTask(taskData, _newTasksListParent, true);
-        }
-        
-        // Hiển thị danh sách công việc đang làm trên dashboard
+     //  foreach (var taskData in newTasks)
+//{
+//    DisplayTask(taskData, _newTasksListParent, true);
+//}
+ClearSpecificTasksUI(_inProgressTasksListParent);
+foreach (var taskData in inProgressTasks)
+{
+    if (taskData.TryGetValue("status", out object statusVal) && statusVal.ToString() == TaskConstants.STATUS_IN_PROGRESS)
+    {
+        DisplayTask(taskData, _inProgressTasksListParent, false);
+    }
+}
+// Hiển thị danh sách công việc đang làm trên dashboard
         foreach (var taskData in inProgressTasks)
         {
             DisplayTask(taskData, _inProgressTasksListParent, false);

@@ -9,73 +9,21 @@ public class TaskDataHandler
 {
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
-    private ListenerRegistration _tasksListener;
-    private ListenerRegistration _inProgressTasksListener;
+    private ListenerRegistration _inProgressTasksListener; // Giữ nguyên listener này
     private bool _initialLoadComplete = false;
 
+    // Delegate cho sự kiện tải trang
+    public event Action<List<Dictionary<string, object>>, bool> OnFilteredTasksLoaded;
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
-    public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
     public event Action OnInitialLoadComplete;
     public event Action<string, string> OnNewTaskAdded;
+
+    private const int TASK_PAGE_SIZE = 20;
 
     public TaskDataHandler(FirebaseFirestore db, string canvasAppId)
     {
         _db = db;
         _canvasAppId = canvasAppId;
-    }
-
-    public void StartListeningForTasks(string filterStatus = TaskConstants.STATUS_ALL)
-    {
-        if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
-        {
-            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể bắt đầu lắng nghe các công việc.");
-            return;
-        }
-
-        StopListeningForFilteredTasks();
-
-        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
-            .Document(_canvasAppId)
-            .Collection("public")
-            .Document("data")
-            .Collection("tasks");
-
-        Query q = tasksCollectionRef.OrderByDescending("timestamp");
-
-        if (filterStatus != TaskConstants.STATUS_ALL)
-        {
-            q = q.WhereEqualTo("status", filterStatus);
-            Debug.Log($"Áp dụng bộ lọc trạng thái: {filterStatus}");
-        }
-
-        _tasksListener = q.Listen(snapshot =>
-        {
-            List<Dictionary<string, object>> filteredTasks = new List<Dictionary<string, object>>();
-            foreach (DocumentSnapshot document in snapshot.Documents)
-            {
-                Dictionary<string, object> taskData = document.ToDictionary();
-                taskData["id"] = document.Id;
-                filteredTasks.Add(taskData);
-            }
-            OnFilteredTasksChanged?.Invoke(filteredTasks);
-
-            if (!_initialLoadComplete)
-            {
-                _initialLoadComplete = true;
-                OnInitialLoadComplete?.Invoke();
-            }
-
-            foreach (DocumentChange change in snapshot.GetChanges())
-            {
-                if (change.ChangeType == DocumentChange.Type.Added)
-                {
-                    Dictionary<string, object> changedDocData = change.Document.ToDictionary();
-                    string content = changedDocData.ContainsKey("content") ? changedDocData["content"].ToString() : "N/A";
-                    string location = changedDocData.ContainsKey("location") ? changedDocData["location"].ToString() : "N/A";
-                    OnNewTaskAdded?.Invoke(content, location);
-                }
-            }
-        });
     }
 
     public void StartListeningForInProgressTasks()
@@ -110,13 +58,51 @@ public class TaskDataHandler
         Debug.Log("Đã bắt đầu lắng nghe riêng cho danh sách 'Đang làm'.");
     }
 
-    public void StopListeningForFilteredTasks()
+    public async Task LoadFilteredTasksAsync(string filterStatus, DocumentSnapshot lastDocument = null)
     {
-        if (_tasksListener != null)
+        if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
         {
-            _tasksListener.Stop();
-            _tasksListener = null;
-            Debug.Log("Đã dừng lắng nghe cập nhật công việc đã lọc.");
+            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể tải các công việc.");
+            return;
+        }
+
+        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
+            .Document(_canvasAppId)
+            .Collection("public")
+            .Document("data")
+            .Collection("tasks");
+
+        Query q = tasksCollectionRef.OrderByDescending("timestamp");
+
+        if (filterStatus != TaskConstants.STATUS_ALL)
+        {
+            q = q.WhereEqualTo("status", filterStatus);
+        }
+
+        if (lastDocument != null)
+        {
+            q = q.StartAfter(lastDocument);
+        }
+
+        q = q.Limit(TASK_PAGE_SIZE);
+
+        QuerySnapshot snapshot = await q.GetSnapshotAsync();
+        
+        List<Dictionary<string, object>> tasks = new List<Dictionary<string, object>>();
+        foreach (DocumentSnapshot document in snapshot.Documents)
+        {
+            Dictionary<string, object> taskData = document.ToDictionary();
+            taskData["id"] = document.Id;
+            tasks.Add(taskData);
+        }
+
+        bool hasMore = tasks.Count == TASK_PAGE_SIZE;
+        OnFilteredTasksLoaded?.Invoke(tasks, hasMore);
+
+        if (!_initialLoadComplete)
+        {
+            _initialLoadComplete = true;
+            OnInitialLoadComplete?.Invoke();
         }
     }
 
@@ -129,7 +115,7 @@ public class TaskDataHandler
             Debug.Log("Đã dừng lắng nghe cập nhật công việc 'Đang làm'.");
         }
     }
-
+    
     public async void AddTask(string content, string location, string description, string[] selectedRisks, string createdBy)
     {
         if (string.IsNullOrEmpty(content) || string.IsNullOrEmpty(location) || string.IsNullOrEmpty(description))

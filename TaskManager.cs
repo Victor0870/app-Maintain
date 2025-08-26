@@ -63,7 +63,7 @@ public class TaskManager : MonoBehaviour
 
         _taskDataHandler = new TaskDataHandler(FirebaseManager.Instance.db, FirebaseManager.Instance.GetCanvasAppId());
         _taskUIManager = new TaskUIManager(
-            mainTaskPanel, taskContentInput, taskLocationInput, taskDescriptionInput,
+            this, mainTaskPanel, taskContentInput, taskLocationInput, taskDescriptionInput,
             addTaskButton, closeDetailsButton, sharedRiskToggles, notificationText,
             loadingIndicatorPanel, loadingPercentageText,
             showTaskListButton, taskListPanel, showInputPanelButton,
@@ -153,6 +153,7 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
+        _taskUIManager.ClearFilteredTasksUI();
         _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
     }
 
@@ -170,6 +171,7 @@ public class TaskManager : MonoBehaviour
     private void HandleTaskStatusChanged(string newStatus)
     {
         _tempNewStatus = newStatus;
+        _taskUIManager.ClearFilteredTasksUI();
         _taskUIManager.ShowConfirmPopup($"Bạn có chắc chắn muốn thay đổi trạng thái công việc này thành '{_tempNewStatus}' không?");
     }
 
@@ -177,7 +179,8 @@ public class TaskManager : MonoBehaviour
     {
         _taskUIManager.HideConfirmPopup();
         if (!string.IsNullOrEmpty(_currentSelectedTaskId) && !string.IsNullOrEmpty(_tempNewStatus))
-        {
+        {                                          
+            _taskUIManager.ClearInProgressTasksUI();
             _taskDataHandler.UpdateTaskStatus(_currentSelectedTaskId, _tempNewStatus);
             _taskUIManager.ShowNotification("Thành công", $"Trạng thái công việc đã được cập nhật thành '{_tempNewStatus}'!");
 
@@ -185,6 +188,10 @@ public class TaskManager : MonoBehaviour
             {
                 _taskUIManager.CloseTaskDetails();
             }
+
+            _taskDataHandler.StartListeningForInProgressTasks();
+            _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+
         }
         _tempNewStatus = null;
     }

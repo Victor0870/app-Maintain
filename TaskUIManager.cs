@@ -51,15 +51,8 @@ public class TaskUIManager
 
     private TMP_Dropdown _statusFilterDropdown;
 
-    //private GameObject _todayTasksPanel;
-    //private Transform _todayTasksListParent;
-    private GameObject _newTasksPanel;
-    private Transform _newTasksListParent;
-    
-    // Thêm tham chiếu đến panel công việc đang làm trên dashboard
     private Transform _inProgressTasksListParent;
 
-    // Các biến cho Popup Xác nhận
     private GameObject _confirmPopupPanel;
     private TextMeshProUGUI _confirmPopupText;
     private Button _confirmYesButton;
@@ -75,7 +68,6 @@ public class TaskUIManager
     public event Action<int> OnStatusFilterChanged;
     public event Action<Dictionary<string, object>> OnTaskItemClicked;
 
-    // Events mới cho Popup Xác nhận
     public event Action OnConfirmYesClicked;
     public event Action OnConfirmNoClicked;
 
@@ -86,11 +78,8 @@ public class TaskUIManager
         Button addTaskButton, Button closeDetailsButton, Toggle[] sharedRiskToggles, TextMeshProUGUI notificationText,
         GameObject loadingIndicatorPanel, TextMeshProUGUI loadingPercentageText,
         Button showTaskListButton, GameObject taskListPanel, Button showInputPanelButton,
-        Toggle detailsStatusToggle, TextMeshProUGUI detailsStatusToggleLabel, Button markAsDoneButton, Button materialsButton,
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
-        //GameObject todayTasksPanel, Transform todayTasksListParent, 
-        //GameObject newTasksPanel, Transform newTasksListParent,
-        Transform inProgressTasksListParent, // Tham số mới
+        Transform inProgressTasksListParent,
         GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton
     )
     {
@@ -107,22 +96,10 @@ public class TaskUIManager
         _showTaskListButton = showTaskListButton;
         _taskListPanel = taskListPanel;
         _showInputPanelButton = showInputPanelButton;
-        _detailsStatusToggle = detailsStatusToggle;
-        _detailsStatusToggleLabel = detailsStatusToggleLabel;
-        _markAsDoneButton = markAsDoneButton;
-        _materialsButton = materialsButton;
         _statusFilterDropdown = statusFilterDropdown;
         _tasksListParent = tasksListParent;
         _taskItemPrefab = taskItemPrefab;
-        //_todayTasksPanel = todayTasksPanel;
-        //_todayTasksListParent = todayTasksListParent;
-       // _newTasksPanel = newTasksPanel;
-       // _newTasksListParent = newTasksListParent;
-        
-        // Gán tham chiếu mới
         _inProgressTasksListParent = inProgressTasksListParent;
-
-        // Gán các tham chiếu của Popup
         _confirmPopupPanel = confirmPopupPanel;
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
@@ -161,10 +138,6 @@ public class TaskUIManager
 
         if (_showInputPanelButton != null) _showInputPanelButton.onClick.AddListener(() => OnShowInputPanelClicked?.Invoke());
 
-        if (_detailsStatusToggle != null) _detailsStatusToggle.onValueChanged.AddListener(isOn => OnDetailsStatusToggleChanged?.Invoke(isOn));
-        if (_markAsDoneButton != null) _markAsDoneButton.onClick.AddListener(() => OnMarkAsDoneClicked?.Invoke());
-        if (_materialsButton != null) _materialsButton.onClick.AddListener(() => OnMaterialsClicked?.Invoke());
-
         if (_statusFilterDropdown != null)
         {
             _statusFilterDropdown.ClearOptions();
@@ -176,7 +149,6 @@ public class TaskUIManager
             _statusFilterDropdown.onValueChanged.AddListener(index => OnStatusFilterChanged?.Invoke(index));
         }
 
-        // Đăng ký sự kiện cho các nút của Popup xác nhận
         if (_confirmYesButton != null) _confirmYesButton.onClick.AddListener(() => OnConfirmYesClicked?.Invoke());
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(() => OnConfirmNoClicked?.Invoke());
     }
@@ -186,10 +158,7 @@ public class TaskUIManager
         if (_taskListPanel != null) _taskListPanel.SetActive(false);
         if (_loadingIndicatorPanel != null) _loadingIndicatorPanel.SetActive(false);
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
-       // if (_todayTasksPanel != null) _todayTasksPanel.SetActive(true);
-       // if (_newTasksPanel != null) _newTasksPanel.SetActive(true);
         
-        // Ẩn Popup khi khởi tạo
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
 
         ShowInputView();
@@ -332,7 +301,6 @@ public class TaskUIManager
         }
     }
 
-    // Cập nhật hàm này để đặt filter mặc định là "Đang chờ"
     public void ToggleTaskListPanelVisibility()
     {
         if (_taskListPanel != null)
@@ -341,7 +309,6 @@ public class TaskUIManager
         }
         if (_statusFilterDropdown != null)
         {
-            // Tìm index của "Đang chờ" và đặt làm mặc định
             int pendingIndex = _statusFilterDropdown.options.FindIndex(option => option.text == TaskConstants.STATUS_PENDING);
             if (pendingIndex != -1)
             {
@@ -432,37 +399,20 @@ public class TaskUIManager
         return TaskConstants.STATUS_ALL;
     }
 
-    // Cập nhật hàm này để xử lý 3 danh sách công việc riêng biệt
-    public void UpdateAllTaskListsUI(List<Dictionary<string, object>> allTasks, List<Dictionary<string, object>> todayTasks, List<Dictionary<string, object>> newTasks, List<Dictionary<string, object>> inProgressTasks)
+    // Phương thức mới để cập nhật danh sách đã lọc
+    public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks)
     {
         ClearSpecificTasksUI(_tasksListParent);
-        //ClearSpecificTasksUI(_todayTasksListParent);
-        //ClearSpecificTasksUI(_newTasksListParent);
-        ClearSpecificTasksUI(_inProgressTasksListParent);
-
-        foreach (var taskData in allTasks)
+        foreach (var taskData in filteredTasks)
         {
             DisplayTask(taskData, _tasksListParent, false);
         }
-
-        //foreach (var taskData in todayTasks)
-        //{
-       //     DisplayTask(taskData, _todayTasksListParent, true);
-      //  }
-
-     //  foreach (var taskData in newTasks)
-//{
-//    DisplayTask(taskData, _newTasksListParent, true);
-//}
-ClearSpecificTasksUI(_inProgressTasksListParent);
-foreach (var taskData in inProgressTasks)
-{
-    if (taskData.TryGetValue("status", out object statusVal) && statusVal.ToString() == TaskConstants.STATUS_IN_PROGRESS)
-    {
-        DisplayTask(taskData, _inProgressTasksListParent, false);
     }
-}
-// Hiển thị danh sách công việc đang làm trên dashboard
+
+    // Phương thức mới để cập nhật danh sách "Đang làm"
+    public void UpdateInProgressTasksUI(List<Dictionary<string, object>> inProgressTasks)
+    {
+        ClearSpecificTasksUI(_inProgressTasksListParent);
         foreach (var taskData in inProgressTasks)
         {
             DisplayTask(taskData, _inProgressTasksListParent, false);
@@ -542,7 +492,6 @@ foreach (var taskData in inProgressTasks)
         }
     }
     
-    // Các phương thức mới cho Popup xác nhận
     public void ShowConfirmPopup(string message)
     {
         if (_confirmPopupPanel != null)

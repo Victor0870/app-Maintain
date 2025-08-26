@@ -200,24 +200,29 @@ public class TaskManager : MonoBehaviour
         }
     }
 
-    private void HandleTaskStatusChanged(string newStatus)
+    private async void HandleTaskStatusChanged(string newStatus)
     {
         _tempNewStatus = newStatus;
         _taskUIManager.ClearFilteredTasksUI();
         _taskUIManager.ShowConfirmPopup($"Bạn có chắc chắn muốn thay đổi trạng thái công việc này thành '{_tempNewStatus}' không?");
     }
 
-    private void HandleConfirmYesClick()
+    private async void HandleConfirmYesClick()
     {
         _taskUIManager.HideConfirmPopup();
         if (!string.IsNullOrEmpty(_currentSelectedTaskId) && !string.IsNullOrEmpty(_tempNewStatus))
         {
-            _taskDataHandler.UpdateTaskStatus(_currentSelectedTaskId, _tempNewStatus);
+            _taskUIManager.ShowLoadingIndicator("Đang cập nhật trạng thái...");
+            await _taskDataHandler.UpdateTaskStatus(_currentSelectedTaskId, _tempNewStatus);
+            _taskUIManager.HideLoadingIndicator();
             _taskUIManager.ShowNotification("Thành công", $"Trạng thái công việc đã được cập nhật thành '{_tempNewStatus}'!");
+
             if (_tempNewStatus == TaskConstants.STATUS_DONE)
             {
                 _taskUIManager.CloseTaskDetails();
             }
+            
+            LoadInitialTasks();
         }
         _tempNewStatus = null;
     }

@@ -399,7 +399,6 @@ public class TaskUIManager
         return TaskConstants.STATUS_ALL;
     }
 
-    // Phương thức mới để cập nhật danh sách đã lọc
     public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks)
     {
         ClearSpecificTasksUI(_tasksListParent);
@@ -409,7 +408,6 @@ public class TaskUIManager
         }
     }
 
-    // Phương thức mới để cập nhật danh sách "Đang làm"
     public void UpdateInProgressTasksUI(List<Dictionary<string, object>> inProgressTasks)
     {
         ClearSpecificTasksUI(_inProgressTasksListParent);

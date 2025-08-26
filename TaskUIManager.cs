@@ -414,6 +414,16 @@ public class TaskUIManager
         }
     }
 
+    public void ClearFilteredTasksUI()
+    {
+        ClearSpecificTasksUI(_tasksListParent);
+    }
+    
+    public void ClearInProgressTasksUI()
+    {
+        ClearSpecificTasksUI(_inProgressTasksListParent);
+    }
+
     public void ShowNewTaskNotification(string content, string location)
     {
         ShowNotification("Công việc mới!", $"'{content}' tại '{location}'");

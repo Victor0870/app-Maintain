@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI; // For Button
 using TMPro; // Important: Add this if you are using TextMeshPro for your UI Text components
 

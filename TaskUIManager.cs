@@ -170,7 +170,6 @@ public class TaskUIManager
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
         
-        // Vô hiệu hóa các nút phân trang ban đầu
         if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(false);
         if (_previousPageButton != null) _previousPageButton.gameObject.SetActive(false);
         if (_pageNumberText != null) _pageNumberText.gameObject.SetActive(false);

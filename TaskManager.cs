@@ -6,6 +6,7 @@ using Firebase.Firestore;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 public class TaskManager : MonoBehaviour
 {
@@ -46,7 +47,7 @@ public class TaskManager : MonoBehaviour
     public TMP_Dropdown statusFilterDropdown;
     [Header("UI Elements - Confirmation Popup")]
     public GameObject confirmPopupPanel;
-    public TextMeshProUGui confirmPopupText;
+    public TextMeshProUGUI confirmPopupText;
     public Button confirmYesButton;
     public Button confirmNoButton;
 
@@ -61,6 +62,9 @@ public class TaskManager : MonoBehaviour
     private const int PAGE_SIZE = 5;
     private int _currentPage = 1;
     private int _totalPages = 1;
+
+    // Danh sách các con trỏ để phân trang
+    private List<DocumentSnapshot> _pageCursors = new List<DocumentSnapshot>();
 
     void Start()
     {
@@ -99,7 +103,6 @@ public class TaskManager : MonoBehaviour
             taskStatusController.OnStatusChanged += HandleTaskStatusChanged;
         }
 
-        _taskDataHandler.OnFilteredTasksChanged += _taskUIManager.UpdateFilteredTasksUI;
         _taskDataHandler.OnInProgressTasksChanged += _taskUIManager.UpdateInProgressTasksUI;
         _taskDataHandler.OnInitialLoadComplete += _taskUIManager.HideLoadingIndicator;
         _taskDataHandler.OnNewTaskAdded += _taskUIManager.ShowNewTaskNotification;
@@ -108,7 +111,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.InitializeSharedRiskTogglesLabels();
 
         _taskDataHandler.StartListeningForInProgressTasks();
-        StartCoroutine(LoadTasks());
+        StartCoroutine(LoadTasks(true)); // Tải trang đầu tiên khi khởi động
     }
 
     void OnDestroy()
@@ -134,7 +137,6 @@ public class TaskManager : MonoBehaviour
 
         if (_taskDataHandler != null)
         {
-            _taskDataHandler.OnFilteredTasksChanged -= _taskUIManager.UpdateFilteredTasksUI;
             _taskDataHandler.OnInProgressTasksChanged -= _taskUIManager.UpdateInProgressTasksUI;
             _taskDataHandler.OnInitialLoadComplete -= _taskUIManager.HideLoadingIndicator;
             _taskDataHandler.OnNewTaskAdded -= _taskUIManager.ShowNewTaskNotification;
@@ -158,7 +160,7 @@ public class TaskManager : MonoBehaviour
     private void HandleShowTaskList()
     {
         _taskUIManager.ToggleTaskListPanelVisibility();
-        StartCoroutine(LoadTasks());
+        StartCoroutine(LoadTasks(true));
     }
 
     private void HandleShowInputPanel()
@@ -168,8 +170,7 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
-        _currentPage = 1;
-        StartCoroutine(LoadTasks());
+        StartCoroutine(LoadTasks(true));
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
@@ -203,9 +204,7 @@ public class TaskManager : MonoBehaviour
                 _taskUIManager.CloseTaskDetails();
             }
             
-            // Xóa và tải lại danh sách khi cập nhật trạng thái
-            _currentPage = 1;
-            StartCoroutine(LoadTasks());
+            StartCoroutine(LoadTasks(true));
             _taskDataHandler.StartListeningForInProgressTasks();
         }
         _tempNewStatus = null;
@@ -226,7 +225,7 @@ public class TaskManager : MonoBehaviour
         if (_currentPage < _totalPages)
         {
             _currentPage++;
-            StartCoroutine(LoadTasks());
+            StartCoroutine(LoadTasks(false));
         }
     }
 
@@ -235,25 +234,50 @@ public class TaskManager : MonoBehaviour
         if (_currentPage > 1)
         {
             _currentPage--;
-            StartCoroutine(LoadTasks());
+            StartCoroutine(LoadTasks(false));
         }
     }
 
-    private IEnumerator LoadTasks()
+    private IEnumerator LoadTasks(bool isNewFilter)
     {
+        if (isNewFilter)
+        {
+            _currentPage = 1;
+            _pageCursors.Clear();
+            _pageCursors.Add(null); // Con trỏ cho trang 1 luôn là null
+        }
+
         _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
         _taskUIManager.ClearFilteredTasksUI();
 
         string filterStatus = _taskUIManager.GetSelectedStatusFilter();
+
+        // Lấy tổng số công việc để tính tổng số trang
         var countTask = _taskDataHandler.GetTotalTaskCount(filterStatus);
         yield return new WaitUntil(() => countTask.IsCompleted);
         long totalTasks = countTask.Result;
         _totalPages = (int)Mathf.Ceil((float)totalTasks / PAGE_SIZE);
 
-        var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, _currentPage, filterStatus);
+        // Tải trang hiện tại
+        DocumentSnapshot startAfterDoc = _pageCursors[_currentPage - 1];
+        var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, startAfterDoc, filterStatus);
         yield return new WaitUntil(() => fetchTask.IsCompleted);
 
         _taskUIManager.HideLoadingIndicator();
+        
+        List<Dictionary<string, object>> tasks = fetchTask.Result;
+        if (tasks != null)
+        {
+            // Cập nhật con trỏ cho trang tiếp theo nếu cần
+            if (tasks.Count > 0 && _currentPage == _pageCursors.Count)
+            {
+                DocumentSnapshot lastDoc = _taskDataHandler.GetDocumentSnapshotFromTaskData(tasks.Last());
+                _pageCursors.Add(lastDoc);
+            }
+
+            _taskUIManager.UpdateFilteredTasksUI(tasks);
+        }
+
         _taskUIManager.UpdatePaginationUI(_currentPage, _totalPages);
     }
 }

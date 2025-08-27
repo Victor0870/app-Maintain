@@ -35,7 +35,9 @@ public class TaskManager : MonoBehaviour
     public Button showInputPanelButton;
     
     [Header("UI Elements - Task List Pagination")]
-    public Button loadMoreButton;
+    public Button nextPageButton;
+    public Button previousPageButton;
+    public TextMeshProUGUI pageNumberText;
 
     [Header("UI Elements - Status Management")]
     public TaskStatusController taskStatusController;
@@ -44,7 +46,7 @@ public class TaskManager : MonoBehaviour
     public TMP_Dropdown statusFilterDropdown;
     [Header("UI Elements - Confirmation Popup")]
     public GameObject confirmPopupPanel;
-    public TextMeshProUGUI confirmPopupText;
+    public TextMeshProUGui confirmPopupText;
     public Button confirmYesButton;
     public Button confirmNoButton;
 
@@ -57,6 +59,8 @@ public class TaskManager : MonoBehaviour
     private string _currentSelectedTaskId;
     private string _tempNewStatus;
     private const int PAGE_SIZE = 5;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
 
     void Start()
     {
@@ -76,7 +80,7 @@ public class TaskManager : MonoBehaviour
             statusFilterDropdown, tasksListParent, taskItemPrefab,
             inProgressTasksListParent,
             confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton,
-            loadMoreButton
+            nextPageButton, previousPageButton, pageNumberText
         );
 
         _taskUIManager.OnAddTaskClicked += HandleAddTask;
@@ -87,7 +91,8 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.OnTaskItemClicked += HandleTaskItemClick;
         _taskUIManager.OnConfirmYesClicked += HandleConfirmYesClick;
         _taskUIManager.OnConfirmNoClicked += HandleConfirmNoClick;
-        _taskUIManager.OnLoadMoreClicked += HandleLoadMoreClick;
+        _taskUIManager.OnNextPageClicked += HandleNextPageClick;
+        _taskUIManager.OnPreviousPageClicked += HandlePreviousPageClick;
 
         if (taskStatusController != null)
         {
@@ -103,7 +108,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.InitializeSharedRiskTogglesLabels();
 
         _taskDataHandler.StartListeningForInProgressTasks();
-        LoadFirstPage();
+        StartCoroutine(LoadTasks());
     }
 
     void OnDestroy()
@@ -118,7 +123,8 @@ public class TaskManager : MonoBehaviour
             _taskUIManager.OnTaskItemClicked -= HandleTaskItemClick;
             _taskUIManager.OnConfirmYesClicked -= HandleConfirmYesClick;
             _taskUIManager.OnConfirmNoClicked -= HandleConfirmNoClick;
-            _taskUIManager.OnLoadMoreClicked -= HandleLoadMoreClick;
+            _taskUIManager.OnNextPageClicked -= HandleNextPageClick;
+            _taskUIManager.OnPreviousPageClicked -= HandlePreviousPageClick;
         }
 
         if (taskStatusController != null)
@@ -132,7 +138,6 @@ public class TaskManager : MonoBehaviour
             _taskDataHandler.OnInProgressTasksChanged -= _taskUIManager.UpdateInProgressTasksUI;
             _taskDataHandler.OnInitialLoadComplete -= _taskUIManager.HideLoadingIndicator;
             _taskDataHandler.OnNewTaskAdded -= _taskUIManager.ShowNewTaskNotification;
-            _taskDataHandler.StopListeningForFilteredTasks();
             _taskDataHandler.StopListeningForInProgressTasks();
         }
     }
@@ -153,6 +158,7 @@ public class TaskManager : MonoBehaviour
     private void HandleShowTaskList()
     {
         _taskUIManager.ToggleTaskListPanelVisibility();
+        StartCoroutine(LoadTasks());
     }
 
     private void HandleShowInputPanel()
@@ -162,7 +168,8 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
-        LoadFirstPage();
+        _currentPage = 1;
+        StartCoroutine(LoadTasks());
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
@@ -197,7 +204,8 @@ public class TaskManager : MonoBehaviour
             }
             
             // Xóa và tải lại danh sách khi cập nhật trạng thái
-            LoadFirstPage();
+            _currentPage = 1;
+            StartCoroutine(LoadTasks());
             _taskDataHandler.StartListeningForInProgressTasks();
         }
         _tempNewStatus = null;
@@ -213,19 +221,39 @@ public class TaskManager : MonoBehaviour
         _tempNewStatus = null;
     }
 
-    private async void LoadFirstPage()
+    private void HandleNextPageClick()
     {
-        _taskUIManager.ClearFilteredTasksUI();
-        _taskDataHandler.ResetPagination();
-        _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
-        await _taskDataHandler.FetchTasksPaged(PAGE_SIZE, _taskUIManager.GetSelectedStatusFilter());
-        _taskUIManager.HideLoadingIndicator();
+        if (_currentPage < _totalPages)
+        {
+            _currentPage++;
+            StartCoroutine(LoadTasks());
+        }
     }
 
-    private async void HandleLoadMoreClick()
+    private void HandlePreviousPageClick()
     {
-        _taskUIManager.ShowLoadingIndicator("Đang tải thêm...");
-        await _taskDataHandler.FetchTasksPaged(PAGE_SIZE, _taskUIManager.GetSelectedStatusFilter());
+        if (_currentPage > 1)
+        {
+            _currentPage--;
+            StartCoroutine(LoadTasks());
+        }
+    }
+
+    private IEnumerator LoadTasks()
+    {
+        _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
+        _taskUIManager.ClearFilteredTasksUI();
+
+        string filterStatus = _taskUIManager.GetSelectedStatusFilter();
+        var countTask = _taskDataHandler.GetTotalTaskCount(filterStatus);
+        yield return new WaitUntil(() => countTask.IsCompleted);
+        long totalTasks = countTask.Result;
+        _totalPages = (int)Mathf.Ceil((float)totalTasks / PAGE_SIZE);
+
+        var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, _currentPage, filterStatus);
+        yield return new WaitUntil(() => fetchTask.IsCompleted);
+
         _taskUIManager.HideLoadingIndicator();
+        _taskUIManager.UpdatePaginationUI(_currentPage, _totalPages);
     }
 }

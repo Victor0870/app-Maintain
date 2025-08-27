@@ -110,7 +110,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.InitializeSharedRiskTogglesLabels();
 
         _taskDataHandler.StartListeningForInProgressTasks();
-        StartCoroutine(LoadTasks(true));
+        LoadTasks(true);
     }
 
     void OnDestroy()
@@ -159,7 +159,7 @@ public class TaskManager : MonoBehaviour
     private void HandleShowTaskList()
     {
         _taskUIManager.ToggleTaskListPanelVisibility();
-        StartCoroutine(LoadTasks(true));
+        LoadTasks(true);
     }
 
     private void HandleShowInputPanel()
@@ -169,7 +169,7 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
-        StartCoroutine(LoadTasks(true));
+        LoadTasks(true);
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
@@ -203,7 +203,7 @@ public class TaskManager : MonoBehaviour
                 _taskUIManager.CloseTaskDetails();
             }
             
-            StartCoroutine(LoadTasks(true));
+            LoadTasks(true);
             _taskDataHandler.StartListeningForInProgressTasks();
         }
         _tempNewStatus = null;
@@ -224,7 +224,7 @@ public class TaskManager : MonoBehaviour
         if (_currentPage < _totalPages)
         {
             _currentPage++;
-            StartCoroutine(LoadTasks(false));
+            LoadTasks(false);
         }
     }
 
@@ -233,55 +233,51 @@ public class TaskManager : MonoBehaviour
         if (_currentPage > 1)
         {
             _currentPage--;
-            StartCoroutine(LoadTasks(false));
+            LoadTasks(false);
         }
     }
 
-    private IEnumerator LoadTasks(bool isNewFilter)
+    private async void LoadTasks(bool isNewFilter)
     {
+        _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
+
         if (isNewFilter)
         {
             _currentPage = 1;
             _pageCursors.Clear();
-        }
-        else if (_currentPage > _pageCursors.Count)
-        {
-            // Tải trang tiếp theo nếu chưa có con trỏ
-            _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
-            string filterStatus = _taskUIManager.GetSelectedStatusFilter();
-            DocumentSnapshot startAfterDoc = _pageCursors[_pageCursors.Count - 1];
-            var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, startAfterDoc, filterStatus);
-            yield return new WaitUntil(() => fetchTask.IsCompleted);
-
-            QuerySnapshot snapshot = fetchTask.Result;
-            if (snapshot != null && snapshot.Documents.Any())
-            {
-                _pageCursors.Add(snapshot.Documents.Last());
-            }
+            _pageCursors.Add(null);
         }
         
-        _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
-        _taskUIManager.ClearFilteredTasksUI();
-
         string filterStatus = _taskUIManager.GetSelectedStatusFilter();
 
-        var countTask = _taskDataHandler.GetTaskCount();
-        yield return new WaitUntil(() => countTask.IsCompleted);
-        long totalTasks = countTask.Result;
+        long totalTasks = await _taskDataHandler.GetTaskCount();
         _totalPages = (int)Mathf.Ceil((float)totalTasks / PAGE_SIZE);
 
         DocumentSnapshot startAfterDoc = null;
         if (_currentPage > 1)
         {
-            startAfterDoc = _pageCursors[_currentPage - 2];
+            // Nếu có con trỏ lưu, lấy nó. Nếu không, tải và lưu con trỏ mới
+            if (_currentPage - 1 < _pageCursors.Count)
+            {
+                startAfterDoc = _pageCursors[_currentPage - 1];
+            }
+            else
+            {
+                // Logic tải trang tiếp theo chưa được lưu con trỏ
+                DocumentSnapshot previousPageCursor = _pageCursors[_currentPage - 2];
+                QuerySnapshot nextPageSnapshot = await _taskDataHandler.FetchTasksPaged(PAGE_SIZE, previousPageCursor, filterStatus);
+                if (nextPageSnapshot != null && nextPageSnapshot.Documents.Any())
+                {
+                    _pageCursors.Add(nextPageSnapshot.Documents.Last());
+                    startAfterDoc = previousPageCursor;
+                }
+            }
         }
         
-        var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, startAfterDoc, filterStatus);
-        yield return new WaitUntil(() => fetchTask.IsCompleted);
+        QuerySnapshot snapshot = await _taskDataHandler.FetchTasksPaged(PAGE_SIZE, startAfterDoc, filterStatus);
 
         _taskUIManager.HideLoadingIndicator();
         
-        QuerySnapshot snapshot = fetchTask.Result;
         if (snapshot != null)
         {
             List<Dictionary<string, object>> tasks = new List<Dictionary<string, object>>();

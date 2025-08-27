@@ -63,7 +63,6 @@ public class TaskManager : MonoBehaviour
     private int _currentPage = 1;
     private int _totalPages = 1;
 
-    // Danh sách các con trỏ để phân trang
     private List<DocumentSnapshot> _pageCursors = new List<DocumentSnapshot>();
 
     void Start()
@@ -111,7 +110,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.InitializeSharedRiskTogglesLabels();
 
         _taskDataHandler.StartListeningForInProgressTasks();
-        StartCoroutine(LoadTasks(true)); // Tải trang đầu tiên khi khởi động
+        StartCoroutine(LoadTasks(true));
     }
 
     void OnDestroy()
@@ -127,7 +126,7 @@ public class TaskManager : MonoBehaviour
             _taskUIManager.OnConfirmYesClicked -= HandleConfirmYesClick;
             _taskUIManager.OnConfirmNoClicked -= HandleConfirmNoClick;
             _taskUIManager.OnNextPageClicked -= HandleNextPageClick;
-            _taskUIManager.OnPreviousPageClicked -= HandlePreviousPageClick;
+            _taskUIManager.OnPreviousPageClicked -= HandlePreviousPageClicked;
         }
 
         if (taskStatusController != null)
@@ -244,37 +243,54 @@ public class TaskManager : MonoBehaviour
         {
             _currentPage = 1;
             _pageCursors.Clear();
-            _pageCursors.Add(null); // Con trỏ cho trang 1 luôn là null
         }
+        else if (_currentPage > _pageCursors.Count)
+        {
+            // Tải trang tiếp theo nếu chưa có con trỏ
+            _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
+            string filterStatus = _taskUIManager.GetSelectedStatusFilter();
+            DocumentSnapshot startAfterDoc = _pageCursors[_pageCursors.Count - 1];
+            var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, startAfterDoc, filterStatus);
+            yield return new WaitUntil(() => fetchTask.IsCompleted);
 
+            QuerySnapshot snapshot = fetchTask.Result;
+            if (snapshot != null && snapshot.Documents.Any())
+            {
+                _pageCursors.Add(snapshot.Documents.Last());
+            }
+        }
+        
         _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
         _taskUIManager.ClearFilteredTasksUI();
 
         string filterStatus = _taskUIManager.GetSelectedStatusFilter();
 
-        // Lấy tổng số công việc để tính tổng số trang
-        var countTask = _taskDataHandler.GetTotalTaskCount(filterStatus);
+        var countTask = _taskDataHandler.GetTaskCount();
         yield return new WaitUntil(() => countTask.IsCompleted);
         long totalTasks = countTask.Result;
         _totalPages = (int)Mathf.Ceil((float)totalTasks / PAGE_SIZE);
 
-        // Tải trang hiện tại
-        DocumentSnapshot startAfterDoc = _pageCursors[_currentPage - 1];
+        DocumentSnapshot startAfterDoc = null;
+        if (_currentPage > 1)
+        {
+            startAfterDoc = _pageCursors[_currentPage - 2];
+        }
+        
         var fetchTask = _taskDataHandler.FetchTasksPaged(PAGE_SIZE, startAfterDoc, filterStatus);
         yield return new WaitUntil(() => fetchTask.IsCompleted);
 
         _taskUIManager.HideLoadingIndicator();
         
-        List<Dictionary<string, object>> tasks = fetchTask.Result;
-        if (tasks != null)
+        QuerySnapshot snapshot = fetchTask.Result;
+        if (snapshot != null)
         {
-            // Cập nhật con trỏ cho trang tiếp theo nếu cần
-            if (tasks.Count > 0 && _currentPage == _pageCursors.Count)
+            List<Dictionary<string, object>> tasks = new List<Dictionary<string, object>>();
+            foreach (DocumentSnapshot doc in snapshot.Documents)
             {
-                DocumentSnapshot lastDoc = _taskDataHandler.GetDocumentSnapshotFromTaskData(tasks.Last());
-                _pageCursors.Add(lastDoc);
+                Dictionary<string, object> taskData = doc.ToDictionary();
+                taskData["id"] = doc.Id;
+                tasks.Add(taskData);
             }
-
             _taskUIManager.UpdateFilteredTasksUI(tasks);
         }
 

@@ -44,7 +44,10 @@ public class TaskUIManager
     private Button _showTaskListButton;
     private GameObject _taskListPanel;
     private Button _showInputPanelButton;
-    private Button _loadMoreButton;
+
+    private Button _nextPageButton;
+    private Button _previousPageButton;
+    private TextMeshProUGUI _pageNumberText;
 
     private Toggle _detailsStatusToggle;
     private TextMeshProUGUI _detailsStatusToggleLabel;
@@ -69,7 +72,8 @@ public class TaskUIManager
     public event Action OnMaterialsClicked;
     public event Action<int> OnStatusFilterChanged;
     public event Action<Dictionary<string, object>> OnTaskItemClicked;
-    public event Action OnLoadMoreClicked;
+    public event Action OnNextPageClicked;
+    public event Action OnPreviousPageClicked;
 
     public event Action OnConfirmYesClicked;
     public event Action OnConfirmNoClicked;
@@ -85,7 +89,7 @@ public class TaskUIManager
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
         Transform inProgressTasksListParent,
         GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton,
-        Button loadMoreButton
+        Button nextPageButton, Button previousPageButton, TextMeshProUGUI pageNumberText
     )
     {
         _mainTaskPanel = mainTaskPanel;
@@ -109,7 +113,9 @@ public class TaskUIManager
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
-        _loadMoreButton = loadMoreButton;
+        _nextPageButton = nextPageButton;
+        _previousPageButton = previousPageButton;
+        _pageNumberText = pageNumberText;
 
         _monoBehaviourContext = monoBehaviourContext;
 
@@ -153,7 +159,8 @@ public class TaskUIManager
 
         if (_confirmYesButton != null) _confirmYesButton.onClick.AddListener(() => OnConfirmYesClicked?.Invoke());
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(() => OnConfirmNoClicked?.Invoke());
-        if (_loadMoreButton != null) _loadMoreButton.onClick.AddListener(() => OnLoadMoreClicked?.Invoke());
+        if (_nextPageButton != null) _nextPageButton.onClick.AddListener(() => OnNextPageClicked?.Invoke());
+        if (_previousPageButton != null) _previousPageButton.onClick.AddListener(() => OnPreviousPageClicked?.Invoke());
     }
 
     public void InitializeUIState()
@@ -162,7 +169,11 @@ public class TaskUIManager
         if (_loadingIndicatorPanel != null) _loadingIndicatorPanel.SetActive(false);
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
-        if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(false);
+        
+        // Vô hiệu hóa các nút phân trang ban đầu
+        if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(false);
+        if (_previousPageButton != null) _previousPageButton.gameObject.SetActive(false);
+        if (_pageNumberText != null) _pageNumberText.gameObject.SetActive(false);
         
         ShowInputView();
     }
@@ -404,16 +415,7 @@ public class TaskUIManager
 
     public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks)
     {
-        // Kiểm tra xem danh sách có trống không để ẩn nút "Tải thêm"
-        if (filteredTasks == null || filteredTasks.Count < 5)
-        {
-            if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(false);
-        }
-        else
-        {
-            if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(true);
-        }
-
+        ClearSpecificTasksUI(_tasksListParent);
         foreach (var taskData in filteredTasks)
         {
             DisplayTask(taskData, _tasksListParent, false);
@@ -530,5 +532,16 @@ public class TaskUIManager
         {
             _confirmPopupPanel.SetActive(false);
         }
+    }
+
+    public void UpdatePaginationUI(int currentPage, int totalPages)
+    {
+        if (_nextPageButton != null) _nextPageButton.gameObject.SetActive(true);
+        if (_previousPageButton != null) _previousPageButton.gameObject.SetActive(true);
+        if (_pageNumberText != null) _pageNumberText.gameObject.SetActive(true);
+
+        if (_previousPageButton != null) _previousPageButton.interactable = (currentPage > 1);
+        if (_nextPageButton != null) _nextPageButton.interactable = (currentPage < totalPages);
+        if (_pageNumberText != null) _pageNumberText.text = $"Trang {currentPage} / {totalPages}";
     }
 }

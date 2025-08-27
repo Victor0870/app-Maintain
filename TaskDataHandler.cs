@@ -22,39 +22,38 @@ public class TaskDataHandler
         _canvasAppId = canvasAppId;
     }
 
-    public async Task<long> GetTotalTaskCount(string filterStatus)
+    // Phương thức mới để lấy tổng số công việc từ biến đếm
+    public async Task<long> GetTaskCount()
     {
         if (_db == null)
         {
-            Debug.LogWarning("Firestore DB chưa có. Không thể đếm công việc.");
             return 0;
         }
 
-        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
+        DocumentReference totalCountRef = _db.Collection("artifacts")
             .Document(_canvasAppId)
             .Collection("public")
             .Document("data")
-            .Collection("tasks");
-
-        Query q = tasksCollectionRef;
-        if (filterStatus != TaskConstants.STATUS_ALL)
-        {
-            q = q.WhereEqualTo("status", filterStatus);
-        }
-
+            .Collection("metadata")
+            .Document(TaskConstants.TOTAL_TASK_COUNT_ID);
+        
         try
         {
-            AggregateQuerySnapshot snapshot = await q.Count().GetSnapshotAsync();
-            return snapshot.Count;
+            DocumentSnapshot snapshot = await totalCountRef.GetSnapshotAsync();
+            if (snapshot.Exists && snapshot.TryGetValue("count", out object countValue))
+            {
+                return Convert.ToInt64(countValue);
+            }
         }
         catch (Exception ex)
         {
-            Debug.LogError("Lỗi khi đếm số công việc: " + ex.Message);
-            return 0;
+            Debug.LogError("Lỗi khi lấy biến đếm tổng số công việc: " + ex.Message);
         }
+
+        return 0;
     }
 
-    public async Task<List<Dictionary<string, object>>> FetchTasksPaged(int pageSize, DocumentSnapshot startAfterDoc, string filterStatus = TaskConstants.STATUS_ALL)
+    public async Task<QuerySnapshot> FetchTasksPaged(int pageSize, DocumentSnapshot startAfterDoc, string filterStatus = TaskConstants.STATUS_ALL)
     {
         if (_db == null)
         {
@@ -83,14 +82,7 @@ public class TaskDataHandler
         try
         {
             QuerySnapshot snapshot = await q.GetSnapshotAsync();
-            List<Dictionary<string, object>> fetchedTasks = new List<Dictionary<string, object>>();
-            foreach (DocumentSnapshot document in snapshot.Documents)
-            {
-                Dictionary<string, object> taskData = document.ToDictionary();
-                taskData["id"] = document.Id;
-                fetchedTasks.Add(taskData);
-            }
-            return fetchedTasks;
+            return snapshot;
         }
         catch (Exception ex)
         {
@@ -107,7 +99,6 @@ public class TaskDataHandler
             return;
         }
 
-        // Dừng lắng nghe cũ nếu có
         StopListeningForInProgressTasks();
 
         CollectionReference tasksCollectionRef = _db.Collection("artifacts")
@@ -169,18 +160,29 @@ public class TaskDataHandler
 
         try
         {
+            // Thêm công việc
             CollectionReference tasksCollectionRef = _db.Collection("artifacts")
                 .Document(_canvasAppId)
                 .Collection("public")
                 .Document("data")
                 .Collection("tasks");
-
             await tasksCollectionRef.AddAsync(taskData);
             Debug.Log("Task added successfully to Firestore!");
+
+            // Tăng biến đếm tổng số công việc
+            DocumentReference totalCountRef = _db.Collection("artifacts")
+                .Document(_canvasAppId)
+                .Collection("public")
+                .Document("data")
+                .Collection("metadata")
+                .Document(TaskConstants.TOTAL_TASK_COUNT_ID);
+            
+            await totalCountRef.UpdateAsync("count", FieldValue.Increment(1));
+            Debug.Log("Đã tăng biến đếm tổng số công việc.");
         }
         catch (Exception ex)
         {
-            Debug.LogError("Error adding task to Firestore: " + ex.Message);
+            Debug.LogError("Error adding task to Firestore or incrementing count: " + ex.Message);
         }
     }
 

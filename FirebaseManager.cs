@@ -1,9 +1,10 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Firebase;
 using Firebase.Auth;
 using Firebase.Firestore;
 using System.Threading.Tasks;
-using Firebase.Extensions; // <<< THÊM DÒNG NÀY VÀO ĐÂY >>>
+using Firebase.Extensions;
+using System.Linq;
 
 public class FirebaseManager : MonoBehaviour
 {
@@ -15,19 +16,14 @@ public class FirebaseManager : MonoBehaviour
     public FirebaseUser user; // Currently signed-in user
     public string userId; // ID of the currently signed-in user
 
-    // This will store the appId from the environment.
-    // In a real Canvas environment, __app_id is globally available.
-    // For local Unity development, you might hardcode it or load from a config file.
-    // IMPORTANT: For local testing, you MUST set this to a fixed string (e.g., "my-task-app-id").
-    // When deploying to Canvas, ensure you use the actual __app_id provided by the environment.
-    private string canvasAppId = "your-unity-app-id-placeholder"; // <<< CHÚ Ý: ĐỔI CÁI NÀY THÀNH ID ỨNG DỤNG CỦA BẠN HOẶC MỘT CHỖ ĐẶT TRƯỚC CHO VIỆC TEST CỤC BỘ >>>
+    private string canvasAppId = "your-unity-app-id-placeholder";
 
     void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // Giữ đối tượng này giữa các cảnh
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -61,9 +57,8 @@ public class FirebaseManager : MonoBehaviour
         db = FirebaseFirestore.DefaultInstance;
 
         auth.StateChanged += AuthStateChanged;
-        AuthStateChanged(this, null); // Gọi một lần để kiểm tra trạng thái hiện tại
+        AuthStateChanged(this, null);
 
-        // Thử đăng nhập ẩn danh
         SignInAnonymously();
     }
 
@@ -77,8 +72,8 @@ public class FirebaseManager : MonoBehaviour
                 user = auth.CurrentUser;
                 userId = user.UserId;
                 Debug.LogFormat("Người dùng đã đăng nhập: {0} ({1})", user.DisplayName, userId);
-                // Sau khi người dùng đăng nhập, bạn có thể bắt đầu lắng nghe các công việc từ Firestore
-                // (Điều này sẽ được xử lý trong script TaskManager)
+                // Kiểm tra và khởi tạo biến đếm tổng số công việc
+                StartCoroutine(InitializeTaskCount());
             }
             else
             {
@@ -93,7 +88,6 @@ public class FirebaseManager : MonoBehaviour
     {
         try
         {
-            // Đăng nhập ẩn danh
             await auth.SignInAnonymouslyAsync();
             Debug.Log("Đăng nhập ẩn danh thành công!");
         }
@@ -101,6 +95,44 @@ public class FirebaseManager : MonoBehaviour
         {
             Debug.LogError("Lỗi khi đăng nhập ẩn danh: " + ex.Message);
         }
+    }
+
+    private System.Collections.IEnumerator InitializeTaskCount()
+    {
+        DocumentReference totalCountRef = db.Collection("artifacts")
+            .Document(canvasAppId)
+            .Collection("public")
+            .Document("data")
+            .Collection("metadata")
+            .Document(TaskConstants.TOTAL_TASK_COUNT_ID);
+
+        var getTask = totalCountRef.GetSnapshotAsync().ContinueWithOnMainThread(task =>
+        {
+            if (task.IsCompleted && task.Result.Exists)
+            {
+                Debug.Log("Biến đếm tổng số công việc đã tồn tại.");
+            }
+            else
+            {
+                Debug.Log("Biến đếm tổng số công việc chưa tồn tại, đang khởi tạo...");
+                CollectionReference tasksCollectionRef = db.Collection("artifacts")
+                    .Document(canvasAppId)
+                    .Collection("public")
+                    .Document("data")
+                    .Collection("tasks");
+                
+                tasksCollectionRef.Count().GetSnapshotAsync().ContinueWithOnMainThread(countTask => {
+                    if (countTask.IsCompleted)
+                    {
+                        long count = countTask.Result.Count;
+                        totalCountRef.SetAsync(new Dictionary<string, object> { { "count", count } });
+                        Debug.Log($"Đã đếm và khởi tạo tổng số công việc là: {count}");
+                    }
+                });
+            }
+        });
+
+        yield return new WaitUntil(() => getTask.IsCompleted);
     }
 
     void OnDestroy()
@@ -111,7 +143,6 @@ public class FirebaseManager : MonoBehaviour
         }
     }
 
-    // Getter cho canvasAppId
     public string GetCanvasAppId()
     {
         return canvasAppId;

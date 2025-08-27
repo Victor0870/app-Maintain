@@ -54,12 +54,12 @@ public class TaskDataHandler
         }
     }
 
-    public async Task FetchTasksPaged(int pageSize, int pageNumber, string filterStatus = TaskConstants.STATUS_ALL)
+    public async Task<List<Dictionary<string, object>>> FetchTasksPaged(int pageSize, DocumentSnapshot startAfterDoc, string filterStatus = TaskConstants.STATUS_ALL)
     {
         if (_db == null)
         {
             Debug.LogWarning("Firestore DB chưa có. Không thể tải các công việc.");
-            return;
+            return null;
         }
 
         CollectionReference tasksCollectionRef = _db.Collection("artifacts")
@@ -68,11 +68,16 @@ public class TaskDataHandler
             .Document("data")
             .Collection("tasks");
 
-        Query q = tasksCollectionRef.OrderByDescending("timestamp").Offset((pageNumber - 1) * pageSize).Limit(pageSize);
+        Query q = tasksCollectionRef.OrderByDescending("timestamp").Limit(pageSize);
 
         if (filterStatus != TaskConstants.STATUS_ALL)
         {
             q = q.WhereEqualTo("status", filterStatus);
+        }
+
+        if (startAfterDoc != null)
+        {
+            q = q.StartAfter(startAfterDoc);
         }
 
         try
@@ -85,12 +90,12 @@ public class TaskDataHandler
                 taskData["id"] = document.Id;
                 fetchedTasks.Add(taskData);
             }
-
-            OnFilteredTasksChanged?.Invoke(fetchedTasks);
+            return fetchedTasks;
         }
         catch (Exception ex)
         {
             Debug.LogError("Lỗi khi tải dữ liệu phân trang từ Firestore: " + ex.Message);
+            return null;
         }
     }
 
@@ -102,6 +107,7 @@ public class TaskDataHandler
             return;
         }
 
+        // Dừng lắng nghe cũ nếu có
         StopListeningForInProgressTasks();
 
         CollectionReference tasksCollectionRef = _db.Collection("artifacts")
@@ -124,11 +130,6 @@ public class TaskDataHandler
             OnInProgressTasksChanged?.Invoke(inProgressTasks);
         });
         Debug.Log("Đã bắt đầu lắng nghe riêng cho danh sách 'Đang làm'.");
-    }
-
-    public void StopListeningForFilteredTasks()
-    {
-        // Giữ nguyên
     }
 
     public void StopListeningForInProgressTasks()

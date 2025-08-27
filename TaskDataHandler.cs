@@ -9,12 +9,7 @@ public class TaskDataHandler
 {
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
-    private ListenerRegistration _tasksListener;
     private ListenerRegistration _inProgressTasksListener;
-    private bool _initialLoadComplete = false;
-
-    // Biến để lưu tài liệu cuối cùng của trang trước để sử dụng cho phân trang
-    private DocumentSnapshot _lastVisibleDocument;
 
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
@@ -27,7 +22,39 @@ public class TaskDataHandler
         _canvasAppId = canvasAppId;
     }
 
-    public async Task FetchTasksPaged(int pageSize, string filterStatus = TaskConstants.STATUS_ALL)
+    public async Task<long> GetTotalTaskCount(string filterStatus)
+    {
+        if (_db == null)
+        {
+            Debug.LogWarning("Firestore DB chưa có. Không thể đếm công việc.");
+            return 0;
+        }
+
+        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
+            .Document(_canvasAppId)
+            .Collection("public")
+            .Document("data")
+            .Collection("tasks");
+
+        Query q = tasksCollectionRef;
+        if (filterStatus != TaskConstants.STATUS_ALL)
+        {
+            q = q.WhereEqualTo("status", filterStatus);
+        }
+
+        try
+        {
+            AggregateQuerySnapshot snapshot = await q.Count().GetSnapshotAsync();
+            return snapshot.Count;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Lỗi khi đếm số công việc: " + ex.Message);
+            return 0;
+        }
+    }
+
+    public async Task FetchTasksPaged(int pageSize, int pageNumber, string filterStatus = TaskConstants.STATUS_ALL)
     {
         if (_db == null)
         {
@@ -41,16 +68,11 @@ public class TaskDataHandler
             .Document("data")
             .Collection("tasks");
 
-        Query q = tasksCollectionRef.OrderByDescending("timestamp").Limit(pageSize);
+        Query q = tasksCollectionRef.OrderByDescending("timestamp").Offset((pageNumber - 1) * pageSize).Limit(pageSize);
 
         if (filterStatus != TaskConstants.STATUS_ALL)
         {
             q = q.WhereEqualTo("status", filterStatus);
-        }
-
-        if (_lastVisibleDocument != null)
-        {
-            q = q.StartAfter(_lastVisibleDocument);
         }
 
         try
@@ -62,15 +84,6 @@ public class TaskDataHandler
                 Dictionary<string, object> taskData = document.ToDictionary();
                 taskData["id"] = document.Id;
                 fetchedTasks.Add(taskData);
-            }
-
-            if (snapshot.Documents.Any())
-            {
-                _lastVisibleDocument = snapshot.Documents.Last();
-            }
-            else
-            {
-                _lastVisibleDocument = null; // Không còn dữ liệu để tải nữa
             }
 
             OnFilteredTasksChanged?.Invoke(fetchedTasks);
@@ -115,12 +128,7 @@ public class TaskDataHandler
 
     public void StopListeningForFilteredTasks()
     {
-        if (_tasksListener != null)
-        {
-            _tasksListener.Stop();
-            _tasksListener = null;
-            Debug.Log("Đã dừng lắng nghe cập nhật công việc đã lọc.");
-        }
+        // Giữ nguyên
     }
 
     public void StopListeningForInProgressTasks()

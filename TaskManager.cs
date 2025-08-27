@@ -126,7 +126,7 @@ public class TaskManager : MonoBehaviour
             _taskUIManager.OnConfirmYesClicked -= HandleConfirmYesClick;
             _taskUIManager.OnConfirmNoClicked -= HandleConfirmNoClick;
             _taskUIManager.OnNextPageClicked -= HandleNextPageClick;
-            _taskUIManager.OnPreviousPageClicked -= HandlePreviousPageClicked;
+            _taskUIManager.OnPreviousPageClicked -= HandlePreviousPageClick;
         }
 
         if (taskStatusController != null)
@@ -256,14 +256,12 @@ public class TaskManager : MonoBehaviour
         DocumentSnapshot startAfterDoc = null;
         if (_currentPage > 1)
         {
-            // Nếu có con trỏ lưu, lấy nó. Nếu không, tải và lưu con trỏ mới
             if (_currentPage - 1 < _pageCursors.Count)
             {
                 startAfterDoc = _pageCursors[_currentPage - 1];
             }
             else
             {
-                // Logic tải trang tiếp theo chưa được lưu con trỏ
                 DocumentSnapshot previousPageCursor = _pageCursors[_currentPage - 2];
                 QuerySnapshot nextPageSnapshot = await _taskDataHandler.FetchTasksPaged(PAGE_SIZE, previousPageCursor, filterStatus);
                 if (nextPageSnapshot != null && nextPageSnapshot.Documents.Any())

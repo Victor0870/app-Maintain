@@ -22,7 +22,6 @@ public class TaskDataHandler
         _canvasAppId = canvasAppId;
     }
 
-    // Phương thức mới để lấy tổng số công việc từ biến đếm
     public async Task<long> GetTaskCount()
     {
         if (_db == null)
@@ -160,7 +159,6 @@ public class TaskDataHandler
 
         try
         {
-            // Thêm công việc
             CollectionReference tasksCollectionRef = _db.Collection("artifacts")
                 .Document(_canvasAppId)
                 .Collection("public")
@@ -169,7 +167,6 @@ public class TaskDataHandler
             await tasksCollectionRef.AddAsync(taskData);
             Debug.Log("Task added successfully to Firestore!");
 
-            // Tăng biến đếm tổng số công việc
             DocumentReference totalCountRef = _db.Collection("artifacts")
                 .Document(_canvasAppId)
                 .Collection("public")

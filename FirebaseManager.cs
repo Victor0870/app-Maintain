@@ -4,7 +4,6 @@ using Firebase.Auth;
 using Firebase.Firestore;
 using System.Threading.Tasks;
 using Firebase.Extensions;
-using System.Linq;
 
 public class FirebaseManager : MonoBehaviour
 {
@@ -13,8 +12,8 @@ public class FirebaseManager : MonoBehaviour
     public DependencyStatus dependencyStatus;
     public FirebaseAuth auth;
     public FirebaseFirestore db;
-    public FirebaseUser user; // Currently signed-in user
-    public string userId; // ID of the currently signed-in user
+    public FirebaseUser user;
+    public string userId;
 
     private string canvasAppId = "your-unity-app-id-placeholder";
 
@@ -72,8 +71,7 @@ public class FirebaseManager : MonoBehaviour
                 user = auth.CurrentUser;
                 userId = user.UserId;
                 Debug.LogFormat("Người dùng đã đăng nhập: {0} ({1})", user.DisplayName, userId);
-                // Kiểm tra và khởi tạo biến đếm tổng số công việc
-                StartCoroutine(InitializeTaskCount());
+                InitializeTaskCount();
             }
             else
             {
@@ -97,7 +95,7 @@ public class FirebaseManager : MonoBehaviour
         }
     }
 
-    private System.Collections.IEnumerator InitializeTaskCount()
+    private async Task InitializeTaskCount()
     {
         DocumentReference totalCountRef = db.Collection("artifacts")
             .Document(canvasAppId)
@@ -106,33 +104,26 @@ public class FirebaseManager : MonoBehaviour
             .Collection("metadata")
             .Document(TaskConstants.TOTAL_TASK_COUNT_ID);
 
-        var getTask = totalCountRef.GetSnapshotAsync().ContinueWithOnMainThread(task =>
-        {
-            if (task.IsCompleted && task.Result.Exists)
-            {
-                Debug.Log("Biến đếm tổng số công việc đã tồn tại.");
-            }
-            else
-            {
-                Debug.Log("Biến đếm tổng số công việc chưa tồn tại, đang khởi tạo...");
-                CollectionReference tasksCollectionRef = db.Collection("artifacts")
-                    .Document(canvasAppId)
-                    .Collection("public")
-                    .Document("data")
-                    .Collection("tasks");
-                
-                tasksCollectionRef.Count().GetSnapshotAsync().ContinueWithOnMainThread(countTask => {
-                    if (countTask.IsCompleted)
-                    {
-                        long count = countTask.Result.Count;
-                        totalCountRef.SetAsync(new Dictionary<string, object> { { "count", count } });
-                        Debug.Log($"Đã đếm và khởi tạo tổng số công việc là: {count}");
-                    }
-                });
-            }
-        });
+        DocumentSnapshot snapshot = await totalCountRef.GetSnapshotAsync();
 
-        yield return new WaitUntil(() => getTask.IsCompleted);
+        if (snapshot.Exists)
+        {
+            Debug.Log("Biến đếm tổng số công việc đã tồn tại.");
+        }
+        else
+        {
+            Debug.Log("Biến đếm tổng số công việc chưa tồn tại, đang khởi tạo...");
+            CollectionReference tasksCollectionRef = db.Collection("artifacts")
+                .Document(canvasAppId)
+                .Collection("public")
+                .Document("data")
+                .Collection("tasks");
+            
+            AggregateQuerySnapshot countSnapshot = await tasksCollectionRef.Count().GetSnapshotAsync();
+            long count = countSnapshot.Count;
+            await totalCountRef.SetAsync(new System.Collections.Generic.Dictionary<string, object> { { "count", count } });
+            Debug.Log($"Đã đếm và khởi tạo tổng số công việc là: {count}");
+        }
     }
 
     void OnDestroy()

@@ -4,6 +4,7 @@ using TMPro;
 using System.Collections.Generic;
 using System;
 using System.Collections;
+using System.Linq;
 
 public class TaskUIManager
 {
@@ -43,6 +44,7 @@ public class TaskUIManager
     private Button _showTaskListButton;
     private GameObject _taskListPanel;
     private Button _showInputPanelButton;
+    private Button _loadMoreButton;
 
     private Toggle _detailsStatusToggle;
     private TextMeshProUGUI _detailsStatusToggleLabel;
@@ -66,14 +68,13 @@ public class TaskUIManager
     public event Action OnMarkAsDoneClicked;
     public event Action OnMaterialsClicked;
     public event Action<int> OnStatusFilterChanged;
-    public event Action OnLoadMoreClicked;
     public event Action<Dictionary<string, object>> OnTaskItemClicked;
+    public event Action OnLoadMoreClicked;
 
     public event Action OnConfirmYesClicked;
     public event Action OnConfirmNoClicked;
 
     private MonoBehaviour _monoBehaviourContext;
-    private Button _loadMoreButton;
 
     public TaskUIManager(
         TaskManager monoBehaviourContext,
@@ -109,7 +110,7 @@ public class TaskUIManager
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
         _loadMoreButton = loadMoreButton;
-        
+
         _monoBehaviourContext = monoBehaviourContext;
 
         SetupUIListeners();
@@ -152,7 +153,6 @@ public class TaskUIManager
 
         if (_confirmYesButton != null) _confirmYesButton.onClick.AddListener(() => OnConfirmYesClicked?.Invoke());
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(() => OnConfirmNoClicked?.Invoke());
-
         if (_loadMoreButton != null) _loadMoreButton.onClick.AddListener(() => OnLoadMoreClicked?.Invoke());
     }
 
@@ -161,9 +161,9 @@ public class TaskUIManager
         if (_taskListPanel != null) _taskListPanel.SetActive(false);
         if (_loadingIndicatorPanel != null) _loadingIndicatorPanel.SetActive(false);
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
-        
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
-
+        if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(false);
+        
         ShowInputView();
     }
 
@@ -402,22 +402,21 @@ public class TaskUIManager
         return TaskConstants.STATUS_ALL;
     }
 
-    public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks, bool hasMore)
+    public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks)
     {
-        ClearSpecificTasksUI(_tasksListParent);
-        AppendFilteredTasksUI(filteredTasks, hasMore);
-    }
-    
-    public void AppendFilteredTasksUI(List<Dictionary<string, object>> tasks, bool hasMore)
-    {
-        foreach (var taskData in tasks)
+        // Kiểm tra xem danh sách có trống không để ẩn nút "Tải thêm"
+        if (filteredTasks == null || filteredTasks.Count < 5)
         {
-            DisplayTask(taskData, _tasksListParent, false);
+            if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(false);
+        }
+        else
+        {
+            if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(true);
         }
 
-        if (_loadMoreButton != null)
+        foreach (var taskData in filteredTasks)
         {
-            _loadMoreButton.gameObject.SetActive(hasMore);
+            DisplayTask(taskData, _tasksListParent, false);
         }
     }
 
@@ -434,7 +433,7 @@ public class TaskUIManager
     {
         ClearSpecificTasksUI(_tasksListParent);
     }
-    
+
     public void ClearInProgressTasksUI()
     {
         ClearSpecificTasksUI(_inProgressTasksListParent);
@@ -512,7 +511,7 @@ public class TaskUIManager
             Debug.LogWarning("TaskItemUI script không tìm thấy trên prefab. Đảm bảo bạn đã gắn nó vào prefab.");
         }
     }
-    
+
     public void ShowConfirmPopup(string message)
     {
         if (_confirmPopupPanel != null)

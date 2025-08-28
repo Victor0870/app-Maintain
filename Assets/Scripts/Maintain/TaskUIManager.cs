@@ -58,6 +58,10 @@ public class TaskUIManager
     private Button _confirmYesButton;
     private Button _confirmNoButton;
 
+    private Button _loadMoreButton; // NEW: Biến cho nút "Tải thêm"
+    private bool _isFirstLoad = true;
+    private List<Dictionary<string, object>> _allFilteredTasks = new List<Dictionary<string, object>>(); // NEW: Lưu trữ tất cả các công việc đã tải
+
     public event Action<string, string, string, string[]> OnAddTaskClicked;
     public event Action OnCloseDetailsClicked;
     public event Action OnShowTaskListClicked;
@@ -67,6 +71,7 @@ public class TaskUIManager
     public event Action OnMaterialsClicked;
     public event Action<int> OnStatusFilterChanged;
     public event Action<Dictionary<string, object>> OnTaskItemClicked;
+    public event Action OnLoadMoreClicked; // NEW: Sự kiện cho nút "Tải thêm"
 
     public event Action OnConfirmYesClicked;
     public event Action OnConfirmNoClicked;
@@ -81,7 +86,8 @@ public class TaskUIManager
         Button showTaskListButton, GameObject taskListPanel, Button showInputPanelButton,
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
         Transform inProgressTasksListParent,
-        GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton
+        GameObject confirmPopupPanel, TextMeshProUGUI confirmPopupText, Button confirmYesButton, Button confirmNoButton,
+        Button loadMoreButton // NEW: Thêm nút tải thêm vào
     )
     {
         _mainTaskPanel = mainTaskPanel;
@@ -105,6 +111,7 @@ public class TaskUIManager
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
+        _loadMoreButton = loadMoreButton; // NEW: Gán biến
 
         _monoBehaviourContext = monoBehaviourContext;
 
@@ -148,6 +155,7 @@ public class TaskUIManager
 
         if (_confirmYesButton != null) _confirmYesButton.onClick.AddListener(() => OnConfirmYesClicked?.Invoke());
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(() => OnConfirmNoClicked?.Invoke());
+        if (_loadMoreButton != null) _loadMoreButton.onClick.AddListener(() => OnLoadMoreClicked?.Invoke()); // NEW: Lắng nghe sự kiện cho nút "Tải thêm"
     }
 
     public void InitializeUIState()
@@ -155,8 +163,8 @@ public class TaskUIManager
         if (_taskListPanel != null) _taskListPanel.SetActive(false);
         if (_loadingIndicatorPanel != null) _loadingIndicatorPanel.SetActive(false);
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
-
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
+        if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(false); // NEW: Ẩn nút "Tải thêm" ban đầu
 
         ShowInputView();
     }
@@ -398,10 +406,24 @@ public class TaskUIManager
 
     public void UpdateFilteredTasksUI(List<Dictionary<string, object>> filteredTasks)
     {
-        ClearSpecificTasksUI(_tasksListParent);
+        // Kiểm tra xem đây là lần tải đầu tiên hay là tải thêm
+        if (_isFirstLoad)
+        {
+            ClearSpecificTasksUI(_tasksListParent);
+            _allFilteredTasks.Clear();
+            _isFirstLoad = false;
+        }
+
         foreach (var taskData in filteredTasks)
         {
+            _allFilteredTasks.Add(taskData);
             DisplayTask(taskData, _tasksListParent, false);
+        }
+
+        // Hiện nút "Tải thêm" nếu có đủ số công việc để cho rằng còn công việc khác để tải
+        if (_loadMoreButton != null)
+        {
+            _loadMoreButton.gameObject.SetActive(filteredTasks.Count > 0);
         }
     }
 
@@ -417,6 +439,8 @@ public class TaskUIManager
     public void ClearFilteredTasksUI()
     {
         ClearSpecificTasksUI(_tasksListParent);
+        _allFilteredTasks.Clear();
+        _isFirstLoad = true;
     }
 
     public void ClearInProgressTasksUI()

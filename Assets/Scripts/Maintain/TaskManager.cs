@@ -4,6 +4,7 @@ using TMPro;
 using Firebase.Extensions;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public class TaskManager : MonoBehaviour
 {
@@ -22,6 +23,7 @@ public class TaskManager : MonoBehaviour
     public Transform tasksListParent;
     public GameObject taskItemPrefab;
     public TextMeshProUGUI notificationText;
+    public Button loadMoreButton; // NEW: Nút để tải thêm công việc
 
     [Header("UI Elements - Loading")]
     public GameObject loadingIndicatorPanel;
@@ -69,7 +71,8 @@ public class TaskManager : MonoBehaviour
             showTaskListButton, taskListPanel, showInputPanelButton,
             statusFilterDropdown, tasksListParent, taskItemPrefab,
             inProgressTasksListParent,
-            confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton
+            confirmPopupPanel, confirmPopupText, confirmYesButton, confirmNoButton,
+            loadMoreButton // NEW: Thêm nút tải thêm vào
         );
 
         _taskUIManager.OnAddTaskClicked += HandleAddTask;
@@ -80,6 +83,7 @@ public class TaskManager : MonoBehaviour
         _taskUIManager.OnTaskItemClicked += HandleTaskItemClick;
         _taskUIManager.OnConfirmYesClicked += HandleConfirmYesClick;
         _taskUIManager.OnConfirmNoClicked += HandleConfirmNoClick;
+        _taskUIManager.OnLoadMoreClicked += HandleLoadMoreTasks; // NEW: Đăng ký sự kiện cho nút "Tải thêm"
 
         if (taskStatusController != null)
         {
@@ -110,6 +114,7 @@ public class TaskManager : MonoBehaviour
             _taskUIManager.OnTaskItemClicked -= HandleTaskItemClick;
             _taskUIManager.OnConfirmYesClicked -= HandleConfirmYesClick;
             _taskUIManager.OnConfirmNoClicked -= HandleConfirmNoClick;
+            _taskUIManager.OnLoadMoreClicked -= HandleLoadMoreTasks; // NEW: Hủy đăng ký sự kiện
         }
 
         if (taskStatusController != null)
@@ -153,7 +158,15 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
+        // Khi thay đổi bộ lọc, tải lại danh sách từ đầu
+        _taskUIManager.ClearFilteredTasksUI();
         _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+    }
+
+    private void HandleLoadMoreTasks()
+    {
+        // Gọi phương thức LoadMoreTasks từ TaskDataHandler
+        _taskDataHandler.LoadMoreTasks(_taskUIManager.GetSelectedStatusFilter());
     }
 
     private void HandleTaskItemClick(Dictionary<string, object> taskData)
@@ -186,6 +199,8 @@ public class TaskManager : MonoBehaviour
             {
                 _taskUIManager.CloseTaskDetails();
             }
+
+            // Tải lại danh sách sau khi cập nhật trạng thái
             _taskUIManager.ClearFilteredTasksUI();
             _taskUIManager.ClearInProgressTasksUI();
             _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());

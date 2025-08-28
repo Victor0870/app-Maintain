@@ -9,9 +9,11 @@ public class TaskDataHandler
 {
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
-    private ListenerRegistration _tasksListener;
     private ListenerRegistration _inProgressTasksListener;
     private bool _initialLoadComplete = false;
+    private DocumentSnapshot _lastDocumentSnapshot = null;
+    private readonly int _pageSize = 10;
+    private ListenerRegistration _tasksListener;
 
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
@@ -26,12 +28,19 @@ public class TaskDataHandler
 
     public void StartListeningForTasks(string filterStatus = TaskConstants.STATUS_ALL)
     {
+        // Sử dụng GetSnapshotAsync cho việc phân trang
+        LoadTasksWithPagination(filterStatus, true);
+    }
+
+    public async Task LoadTasksWithPagination(string filterStatus, bool isFirstLoad = false)
+    {
         if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
         {
-            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể bắt đầu lắng nghe các công việc.");
+            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể tải các công việc.");
             return;
         }
 
+        // Dừng listener cũ nếu có, vì chúng ta sẽ dùng GetAsync thay vì Listen
         StopListeningForFilteredTasks();
 
         CollectionReference tasksCollectionRef = _db.Collection("artifacts")
@@ -40,42 +49,58 @@ public class TaskDataHandler
             .Document("data")
             .Collection("tasks");
 
-        Query q = tasksCollectionRef.OrderByDescending("timestamp");
+        Query q = tasksCollectionRef.OrderByDescending("timestamp").Limit(_pageSize);
 
         if (filterStatus != TaskConstants.STATUS_ALL)
         {
             q = q.WhereEqualTo("status", filterStatus);
-            Debug.Log($"Áp dụng bộ lọc trạng thái: {filterStatus}");
         }
 
-        _tasksListener = q.Listen(snapshot =>
+        if (!isFirstLoad && _lastDocumentSnapshot != null)
         {
-            List<Dictionary<string, object>> filteredTasks = new List<Dictionary<string, object>>();
+            q = q.StartAfter(_lastDocumentSnapshot);
+        }
+        else
+        {
+            _lastDocumentSnapshot = null;
+        }
+
+        try
+        {
+            QuerySnapshot snapshot = await q.GetSnapshotAsync();
+            List<Dictionary<string, object>> tasks = new List<Dictionary<string, object>>();
+
             foreach (DocumentSnapshot document in snapshot.Documents)
             {
                 Dictionary<string, object> taskData = document.ToDictionary();
                 taskData["id"] = document.Id;
-                filteredTasks.Add(taskData);
+                tasks.Add(taskData);
             }
-            OnFilteredTasksChanged?.Invoke(filteredTasks);
+
+            // Đoạn mã đã được sửa theo đề xuất của bạn
+            var docs = snapshot.Documents as System.Collections.Generic.IReadOnlyList<DocumentSnapshot>;
+            if (docs != null && docs.Count > 0)
+            {
+                _lastDocumentSnapshot = docs[docs.Count - 1];
+            }
+
+            OnFilteredTasksChanged?.Invoke(tasks);
 
             if (!_initialLoadComplete)
             {
                 _initialLoadComplete = true;
                 OnInitialLoadComplete?.Invoke();
             }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Lỗi khi tải công việc: " + ex.Message);
+        }
+    }
 
-            foreach (DocumentChange change in snapshot.GetChanges())
-            {
-                if (change.ChangeType == DocumentChange.Type.Added)
-                {
-                    Dictionary<string, object> changedDocData = change.Document.ToDictionary();
-                    string content = changedDocData.ContainsKey("content") ? changedDocData["content"].ToString() : "N/A";
-                    string location = changedDocData.ContainsKey("location") ? changedDocData["location"].ToString() : "N/A";
-                    OnNewTaskAdded?.Invoke(content, location);
-                }
-            }
-        });
+    public void LoadMoreTasks(string filterStatus)
+    {
+        LoadTasksWithPagination(filterStatus, false);
     }
 
     public void StartListeningForInProgressTasks()

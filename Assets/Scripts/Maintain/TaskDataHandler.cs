@@ -14,6 +14,9 @@ public class TaskDataHandler
     private DocumentSnapshot _lastDocumentSnapshot = null;
     private readonly int _pageSize = 10;
     private ListenerRegistration _tasksListener;
+    private string _currentFilterStatus;
+    private bool _isFirstLoad = true;
+
 
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
@@ -26,13 +29,32 @@ public class TaskDataHandler
         _canvasAppId = canvasAppId;
     }
 
-    public void StartListeningForTasks(string filterStatus = TaskConstants.STATUS_ALL)
+    public DocumentReference GetTaskDocument(string taskId)
     {
-        // Sử dụng GetSnapshotAsync cho việc phân trang
-        LoadTasksWithPagination(filterStatus, true);
+        return _db.Collection("artifacts")
+            .Document(_canvasAppId)
+            .Collection("public")
+            .Document("data")
+            .Collection("tasks")
+            .Document(taskId);
     }
 
-    public async Task LoadTasksWithPagination(string filterStatus, bool isFirstLoad = false)
+    public CollectionReference GetTaskMaterialsCollection(string taskId)
+    {
+        return GetTaskDocument(taskId).Collection("materials");
+    }
+
+    public void StartListeningForTasks(string filterStatus = TaskConstants.STATUS_ALL)
+    {
+        StopListeningForFilteredTasks();
+
+        _currentFilterStatus = filterStatus;
+        _isFirstLoad = true;
+        _lastDocumentSnapshot = null;
+        LoadTasksWithPagination();
+    }
+
+    public async void LoadTasksWithPagination()
     {
         if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
         {
@@ -40,30 +62,25 @@ public class TaskDataHandler
             return;
         }
 
-        // Dừng listener cũ nếu có, vì chúng ta sẽ dùng GetAsync thay vì Listen
-        StopListeningForFilteredTasks();
-
         CollectionReference tasksCollectionRef = _db.Collection("artifacts")
             .Document(_canvasAppId)
             .Collection("public")
             .Document("data")
             .Collection("tasks");
 
-        Query q = tasksCollectionRef.OrderByDescending("timestamp").Limit(_pageSize);
+        Query q = tasksCollectionRef.OrderByDescending("timestamp");
 
-        if (filterStatus != TaskConstants.STATUS_ALL)
+        if (_currentFilterStatus != TaskConstants.STATUS_ALL)
         {
-            q = q.WhereEqualTo("status", filterStatus);
+            q = q.WhereEqualTo("status", _currentFilterStatus);
         }
 
-        if (!isFirstLoad && _lastDocumentSnapshot != null)
+        if (_lastDocumentSnapshot != null)
         {
             q = q.StartAfter(_lastDocumentSnapshot);
         }
-        else
-        {
-            _lastDocumentSnapshot = null;
-        }
+
+        q = q.Limit(_pageSize);
 
         try
         {
@@ -77,18 +94,16 @@ public class TaskDataHandler
                 tasks.Add(taskData);
             }
 
-            // Đoạn mã đã được sửa theo đề xuất của bạn
-            var docs = snapshot.Documents as System.Collections.Generic.IReadOnlyList<DocumentSnapshot>;
-            if (docs != null && docs.Count > 0)
+            if (snapshot.Documents.Count() > 0)
             {
-                _lastDocumentSnapshot = docs[docs.Count - 1];
+                _lastDocumentSnapshot = snapshot.Documents.ElementAt(snapshot.Documents.Count() - 1);
             }
 
             OnFilteredTasksChanged?.Invoke(tasks);
 
-            if (!_initialLoadComplete)
+            if (_isFirstLoad)
             {
-                _initialLoadComplete = true;
+                _isFirstLoad = false;
                 OnInitialLoadComplete?.Invoke();
             }
         }
@@ -96,11 +111,6 @@ public class TaskDataHandler
         {
             Debug.LogError("Lỗi khi tải công việc: " + ex.Message);
         }
-    }
-
-    public void LoadMoreTasks(string filterStatus)
-    {
-        LoadTasksWithPagination(filterStatus, false);
     }
 
     public void StartListeningForInProgressTasks()
@@ -227,5 +237,9 @@ public class TaskDataHandler
         {
             Debug.LogError($"Lỗi khi cập nhật trạng thái công việc {taskId}: {ex.Message}");
         }
+    }
+    public void LoadMoreTasks()
+    {
+        LoadTasksWithPagination();
     }
 }

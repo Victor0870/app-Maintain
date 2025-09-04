@@ -27,12 +27,12 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
         try
         {
             QuerySnapshot firebaseSnapshot = await materialsCollection.GetSnapshotAsync();
-            var firebaseDataByNo = new Dictionary<string, Dictionary<string, object>>();
+            var firebaseDataByNo = new Dictionary<string, (Dictionary<string, object> data, string docId)>();
             foreach (DocumentSnapshot doc in firebaseSnapshot.Documents)
             {
                 if (doc.TryGetValue("No", out object noValue) && noValue is string noString)
                 {
-                    firebaseDataByNo[noString] = doc.ToDictionary();
+                    firebaseDataByNo[noString] = (doc.ToDictionary(), doc.Id);
                 }
             }
 
@@ -42,8 +42,10 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                 localEntitiesByNo[entity.f_No.ToString()] = entity;
             });
 
-            foreach (var firebaseItem in firebaseDataByNo.Values)
+            foreach (var firebaseItemEntry in firebaseDataByNo.Values)
             {
+                var firebaseItem = firebaseItemEntry.data;
+                var firebaseDocId = firebaseItemEntry.docId;
                 string itemNo = firebaseItem.TryGetValue("No", out object noVal) ? (noVal?.ToString() ?? "") : "";
 
                 if (localEntitiesByNo.ContainsKey(itemNo))
@@ -51,6 +53,10 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                     var localEntity = localEntitiesByNo[itemNo];
                     bool needsUpdate = false;
 
+                    // Thêm dòng này để lưu Document ID vào BGDatabase
+                    if (!string.Equals(localEntity.f_materialID, firebaseDocId)) { localEntity.f_materialID = firebaseDocId; needsUpdate = true; }
+
+                    // ... (Các đoạn mã so sánh và cập nhật khác)
                     string name = firebaseItem.TryGetValue("name", out object nameVal) ? (nameVal?.ToString() ?? "") : "";
                     if (!string.Equals(localEntity.f_name, name)) { localEntity.f_name = name; needsUpdate = true; }
 
@@ -81,6 +87,7 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                 {
                     E_SparePart newEntity = E_SparePart.NewEntity();
                     newEntity.f_No = int.Parse(itemNo);
+                    newEntity.f_materialID = firebaseDocId; // Thêm dòng này cho vật tư mới
                     newEntity.f_name = firebaseItem.TryGetValue("name", out object nameVal) ? (nameVal?.ToString() ?? "") : "";
                     newEntity.f_Purpose = firebaseItem.TryGetValue("purpose", out object purposeVal) ? (purposeVal?.ToString() ?? "") : "";
                     newEntity.f_Type = firebaseItem.TryGetValue("type", out object typeVal) ? (typeVal?.ToString() ?? "") : "";
@@ -91,8 +98,6 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                     Debug.Log($"Đã thêm mới mục '{newEntity.f_name}' (No: {itemNo}) vào BGDatabase.");
                 }
             }
-
-           //BGRepo.I.SetRepoDirty();
             Debug.Log("Quá trình đồng bộ hóa đã hoàn tất.");
             return true;
         }

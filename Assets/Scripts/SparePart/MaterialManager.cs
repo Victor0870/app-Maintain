@@ -48,14 +48,16 @@ public class MaterialManager : MonoBehaviour
     public Button addNewUsageButton;
     public Button confirmUsageButton;
 
+    // Biến công khai để tham chiếu đến script BGDatabaseToFirebaseSynchronizer.
+    // Gán biến này bằng cách kéo và thả trong Unity Editor.
+    public BGDatabaseToFirebaseSynchronizer synchronizerToFirebase;
+
     private List<E_SparePart> _allMaterials = new List<E_SparePart>();
     private string _currentTaskId;
 
     private MaterialUIManager _materialUIManager;
     private FirebaseToBGDatabaseSynchronizer _synchronizer;
     private MaterialDataHandler _materialDataHandler;
-
-    public BGDatabaseToFirebaseSynchronizer _synchronizerToFirebase;
 
     private Dictionary<string, object> _temporaryTaskMaterials = new Dictionary<string, object>();
 
@@ -67,11 +69,19 @@ public class MaterialManager : MonoBehaviour
             Invoke("Start", 1f);
             return;
         }
-        //_synchronizerToFirebase = GetComponent<BGDatabaseToFirebaseSynchronizer>();
+
         _synchronizer = GetComponent<FirebaseToBGDatabaseSynchronizer>();
         if (_synchronizer == null)
         {
             Debug.LogError("Thiếu script FirebaseToBGDatabaseSynchronizer trên cùng GameObject. Vui lòng thêm nó.");
+            return;
+        }
+
+        // Thêm dòng này để tự động tìm và gán tham chiếu đến synchronizerToFirebase
+        synchronizerToFirebase = FindObjectOfType<BGDatabaseToFirebaseSynchronizer>();
+        if (synchronizerToFirebase == null)
+        {
+            Debug.LogError("Thiếu script BGDatabaseToFirebaseSynchronizer trong scene.");
             return;
         }
 
@@ -223,7 +233,6 @@ public class MaterialManager : MonoBehaviour
 
     private void HandleAddNewUsageClicked()
     {
-        //_materialUIManager.HideMaterialUsagePanel();
         _materialUIManager.ShowMaterialSelectPanel();
         _materialUIManager.UpdateMaterialsListUI(_allMaterials, true);
     }
@@ -249,6 +258,8 @@ public class MaterialManager : MonoBehaviour
                         if (localMaterial != null)
                         {
                             localMaterial.f_Stock -= quantityChange;
+                            // Đồng bộ vật tư cụ thể vừa thay đổi lên Firebase
+                            await synchronizerToFirebase.SynchronizeSingleSparePart(localMaterial);
                         }
                     }
                     await _materialDataHandler.UpdateMaterialUsage(_currentTaskId, item.materialId, item.quantity, item.changeType);
@@ -262,12 +273,11 @@ public class MaterialManager : MonoBehaviour
                 if (localMaterial != null)
                 {
                     localMaterial.f_Stock -= item.quantity;
+                    // Đồng bộ vật tư cụ thể vừa thay đổi lên Firebase
+                    await synchronizerToFirebase.SynchronizeSingleSparePart(localMaterial);
                 }
             }
         }
-
-        // Sau khi cập nhật tất cả vật tư cục bộ, đồng bộ lên Firebase
-        _synchronizerToFirebase.SynchronizeSparePartsData();
 
         _temporaryTaskMaterials.Clear();
     }

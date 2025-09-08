@@ -55,12 +55,13 @@ public class MaterialDataHandler
         }
     }
 
-    public async Task AddMaterialToTask(string taskId, string materialId, int initialQuantity)
+    // THAY ĐỔI: Trả về ID tài liệu Firestore
+    public async Task<string> AddMaterialToTask(string taskId, string materialId, int initialQuantity)
     {
         if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(materialId))
         {
             Debug.LogError("Task ID hoặc Material ID không hợp lệ.");
-            return;
+            return null;
         }
 
         var newUsageItem = new Dictionary<string, object>
@@ -68,39 +69,42 @@ public class MaterialDataHandler
             { "materialId", materialId },
             { "quantity", initialQuantity },
             { "timestamp", FieldValue.ServerTimestamp },
-            { "status", "Đang chờ xác nhận" }
+            { "status", "Đã sử dụng" } // Thêm trạng thái mặc định
         };
 
         try
         {
-            await FirebasePathUtils.GetTaskMaterialsCollection(_canvasAppId, _db, taskId).AddAsync(newUsageItem);
-            Debug.Log($"Đã thêm vật tư {materialId} vào công việc {taskId}.");
+            DocumentReference newDocRef = await FirebasePathUtils.GetTaskMaterialsCollection(_canvasAppId, _db, taskId).AddAsync(newUsageItem);
+            Debug.Log($"Đã thêm vật tư {materialId} vào công việc {taskId}. ID Firestore: {newDocRef.Id}");
+            return newDocRef.Id;
         }
         catch (Exception ex)
         {
             Debug.LogError($"Lỗi khi thêm vật tư vào công việc: {ex.Message}");
+            return null;
         }
     }
 
-    public async Task UpdateMaterialUsage(string taskId, string materialId, int newQuantity, MaterialUIManager.ChangeType changeType)
+    // THAY ĐỔI: Chấp nhận firestoreDocId thay vì materialId
+    public async Task UpdateMaterialUsage(string taskId, string firestoreDocId, int newQuantity)
     {
-        if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(materialId))
+        if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(firestoreDocId))
         {
-            Debug.LogError("Task ID hoặc Material ID không hợp lệ.");
+            Debug.LogError("Task ID hoặc Firestore Doc ID không hợp lệ.");
             return;
         }
 
         try
         {
             var taskMaterialDocRef = FirebasePathUtils.GetTaskMaterialsCollection(_canvasAppId, _db, taskId)
-                                                     .Document(materialId);
+                                                     .Document(firestoreDocId);
             var updates = new Dictionary<string, object>
             {
                 { "quantity", newQuantity },
-                { "lastUpdated", FieldValue.ServerTimestamp }
+                { "timestamp", FieldValue.ServerTimestamp }
             };
             await taskMaterialDocRef.UpdateAsync(updates);
-            Debug.Log($"Đã cập nhật số lượng vật tư {materialId} trong công việc {taskId}.");
+            Debug.Log($"Đã cập nhật số lượng vật tư {firestoreDocId} trong công việc {taskId}.");
         }
         catch (Exception ex)
         {
@@ -108,21 +112,21 @@ public class MaterialDataHandler
         }
     }
 
-    // THÊM PHƯƠNG THỨC MỚI ĐỂ XÓA TÀI LIỆU SỬ DỤNG VẬT TƯ
-    public async Task DeleteMaterialUsage(string taskId, string materialId)
+    // THAY ĐỔI: Chấp nhận firestoreDocId thay vì materialId
+    public async Task DeleteMaterialUsage(string taskId, string firestoreDocId)
     {
-        if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(materialId))
+        if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(firestoreDocId))
         {
-            Debug.LogError("Task ID hoặc Material ID không hợp lệ.");
+            Debug.LogError("Task ID hoặc Firestore Doc ID không hợp lệ.");
             return;
         }
 
         try
         {
             var taskMaterialDocRef = FirebasePathUtils.GetTaskMaterialsCollection(_canvasAppId, _db, taskId)
-                                                     .Document(materialId);
+                                                     .Document(firestoreDocId);
             await taskMaterialDocRef.DeleteAsync();
-            Debug.Log($"Đã xóa vật tư {materialId} khỏi công việc {taskId} trên Firestore.");
+            Debug.Log($"Đã xóa vật tư {firestoreDocId} khỏi công việc {taskId} trên Firestore.");
         }
         catch (Exception ex)
         {
@@ -130,6 +134,7 @@ public class MaterialDataHandler
         }
     }
 
+    // Phương thức này có vẻ không được sử dụng, nhưng vẫn giữ lại để hoàn chỉnh
     public async Task UpdateMaterialStock(string taskId, string materialId, int quantityChange)
     {
         if (!int.TryParse(materialId, out int materialNo))
@@ -161,5 +166,4 @@ public class MaterialDataHandler
             await materialDocRef.Collection("usageHistory").AddAsync(usageHistory);
         }
     }
-
 }

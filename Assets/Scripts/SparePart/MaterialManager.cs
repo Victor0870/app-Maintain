@@ -53,6 +53,7 @@ public class MaterialManager : MonoBehaviour
     public Button confirmUsageButton;
 
     public BGDatabaseToFirebaseSynchronizer synchronizerToFirebase;
+    public FirebaseToBGDatabaseMaterialUsageSynchronizer materialUsageSynchronizer; // BIẾN MỚI
 
     private List<E_SparePart> _allMaterials = new List<E_SparePart>();
     private string _currentTaskId;
@@ -84,6 +85,13 @@ public class MaterialManager : MonoBehaviour
         if (synchronizerToFirebase == null)
         {
             Debug.LogError("Thiếu script BGDatabaseToFirebaseSynchronizer trong scene.");
+            return;
+        }
+
+        materialUsageSynchronizer = FindObjectOfType<FirebaseToBGDatabaseMaterialUsageSynchronizer>(); // KHỞI TẠO BIẾN MỚI
+        if (materialUsageSynchronizer == null)
+        {
+            Debug.LogError("Thiếu script FirebaseToBGDatabaseMaterialUsageSynchronizer trong scene.");
             return;
         }
 
@@ -120,8 +128,7 @@ public class MaterialManager : MonoBehaviour
         if (materialSelectPanel != null) materialSelectPanel.SetActive(false);
         if (confirmPanel != null) confirmPanel.SetActive(false);
 
-
-
+        // ĐỒNG BỘ HÓA TỒN KHO VẬT TƯ
         DateTime latestLocalTimestamp = DateTime.MinValue;
         if (E_SparePart.CountEntities > 0)
         {
@@ -129,8 +136,17 @@ public class MaterialManager : MonoBehaviour
                 .OrderByDescending(entity => entity.f_lastUpdate)
                 .FirstOrDefault()?.f_lastUpdate ?? DateTime.MinValue;
         }
-
         bool syncSuccess = await _synchronizer.SynchronizeSparePartsFromFirebase(latestLocalTimestamp);
+
+        // ĐỒNG BỘ HÓA LỊCH SỬ SỬ DỤNG VẬT TƯ
+        DateTime latestUsageSyncTimestamp = DateTime.MinValue;
+        if (E_UsageHistory.CountEntities > 0)
+        {
+            latestUsageSyncTimestamp = E_UsageHistory.FindEntities(entity => entity.f_timestamp > DateTime.MinValue)
+                                                     .OrderByDescending(entity => entity.f_timestamp)
+                                                     .FirstOrDefault()?.f_timestamp ?? DateTime.MinValue;
+        }
+        await materialUsageSynchronizer.SynchronizeMaterialUsagesFromFirebase(latestUsageSyncTimestamp);
 
         if (syncSuccess)
         {
@@ -201,21 +217,21 @@ public class MaterialManager : MonoBehaviour
 
         _materialDataHandler.StopListeningForTaskMaterials();
     }
-
     private async void HandleRemoveMaterialConfirmed(string materialId)
     {
-        // Kiểm tra xem vật tư có tồn tại trên Firestore hay không trước khi xóa
-        var existingUsageItem = _materialDataHandler.CurrentTaskMaterials.FirstOrDefault(m => m.TryGetValue("materialId", out object id) && id.ToString() == materialId);
+        var localUsageRecord = E_UsageHistory.FindEntity(e => e.f_materialId == materialId && e.f_taskId == _currentTaskId);
 
-        // Xóa vật tư khỏi Firebase trước
-        if (existingUsageItem != null)
+        if (localUsageRecord != null && !string.IsNullOrEmpty(localUsageRecord.f_firestoreDocId))
         {
-            // Sử dụng ID của tài liệu để xóa
-            string firestoreDocId = existingUsageItem.TryGetValue("id", out object docId) ? docId.ToString() : null;
-            if (!string.IsNullOrEmpty(firestoreDocId))
-            {
-                await _materialDataHandler.DeleteMaterialUsage(_currentTaskId, firestoreDocId);
-            }
+            await _materialDataHandler.DeleteMaterialUsage(_currentTaskId, localUsageRecord.f_firestoreDocId);
+
+            localUsageRecord.Delete();
+            SaveData.Save();
+            Debug.Log("Đã xóa bản ghi sử dụng vật tư cục bộ.");
+        }
+        else
+        {
+            Debug.LogWarning("Không tìm thấy bản ghi cục bộ hoặc thiếu firestoreDocId. Không thể xóa trên Firebase.");
         }
 
         // Cập nhật stock cục bộ và đồng bộ lên Firebase
@@ -288,15 +304,18 @@ public class MaterialManager : MonoBehaviour
     private async void HandleConfirmUsageClicked()
     {
         var allUsageItems = _materialUIManager.GetAllMaterialUsageItems();
-        var existingTaskMaterials = new HashSet<string>(_materialDataHandler.CurrentTaskMaterials.Select(m => m["materialId"].ToString()));
 
         foreach (var item in allUsageItems)
         {
-            if (existingTaskMaterials.Contains(item.materialId))
+            // Tìm bản ghi cục bộ để lấy firestoreDocId
+            var localUsageRecord = E_UsageHistory.FindEntity(e => e.f_materialId == item.materialId && e.f_taskId == _currentTaskId);
+
+            // Kiểm tra xem có phải là vật tư đã tồn tại trên Firebase và đang được cập nhật không
+            if (localUsageRecord != null && !string.IsNullOrEmpty(localUsageRecord.f_firestoreDocId))
             {
                 if (item.changeType != MaterialUIManager.ChangeType.NoChange)
                 {
-                    int quantityChange = item.quantity - item.oldQuantity;
+                    int quantityChange = item.quantity - localUsageRecord.f_quantity;
                     if (quantityChange != 0)
                     {
                         var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == item.materialId);
@@ -308,12 +327,32 @@ public class MaterialManager : MonoBehaviour
                             Debug.Log("Đã lưu dữ liệu vào bộ nhớ cục bộ sau khi cập nhật stock.");
                         }
                     }
-                    await _materialDataHandler.UpdateMaterialUsage(_currentTaskId, item.materialId, item.quantity, item.changeType);
+                    // GỌI PHƯƠNG THỨC MỚI VỚI firestoreDocId
+                    await _materialDataHandler.UpdateMaterialUsage(_currentTaskId, localUsageRecord.f_firestoreDocId, item.quantity);
+
+                    // Cập nhật lại bản ghi cục bộ
+                    localUsageRecord.f_quantity = item.quantity;
+                    localUsageRecord.f_timestamp = DateTime.Now;
+                    SaveData.Save();
                 }
             }
             else
             {
-                await _materialDataHandler.AddMaterialToTask(_currentTaskId, item.materialId, item.quantity);
+                // Trường hợp thêm mới vật tư
+                // CHÚ Ý: CẦN SỬA MaterialDataHandler.AddMaterialToTask để trả về firestoreDocId
+                string firestoreDocId = await _materialDataHandler.AddMaterialToTask(_currentTaskId, item.materialId, item.quantity);
+
+                if (!string.IsNullOrEmpty(firestoreDocId))
+                {
+                    var newUsageRecord = E_UsageHistory.NewEntity();
+                    newUsageRecord.f_taskId = _currentTaskId;
+                    newUsageRecord.f_materialId = item.materialId;
+                    newUsageRecord.f_quantity = item.quantity;
+                    newUsageRecord.f_timestamp = DateTime.Now;
+                    newUsageRecord.f_firestoreDocId = firestoreDocId;
+                    SaveData.Save();
+                }
+
                 var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == item.materialId);
                 if (localMaterial != null)
                 {
@@ -328,31 +367,55 @@ public class MaterialManager : MonoBehaviour
         _temporaryTaskMaterials.Clear();
     }
 
-    private void HandleAddMaterialToTaskClicked(string materialId, int initialQuantity)
+    private async void HandleAddMaterialToTaskClicked(string materialId, int initialQuantity)
     {
         _materialUIManager.HideMaterialSelectPanel();
 
+        // Kiểm tra xem vật tư đã có trong danh sách tạm thời chưa
         if (!_temporaryTaskMaterials.ContainsKey(materialId))
         {
-            var newUsageItem = new Dictionary<string, object>
+            // Kiểm tra xem vật tư có tồn tại trong bảng lịch sử cục bộ không
+            var localUsageRecord = E_UsageHistory.FindEntity(e => e.f_materialId == materialId && e.f_taskId == _currentTaskId);
+
+            if (localUsageRecord == null)
             {
-                { "materialId", materialId },
-                { "quantity", initialQuantity },
-                { "status", "Đang chờ xác nhận" }
-            };
-            _temporaryTaskMaterials[materialId] = newUsageItem;
+                // Thêm mới
+                string firestoreDocId = await _materialDataHandler.AddMaterialToTask(_currentTaskId, materialId, initialQuantity);
+                if (!string.IsNullOrEmpty(firestoreDocId))
+                {
+                    var newUsageRecord = E_UsageHistory.NewEntity();
+                    newUsageRecord.f_taskId = _currentTaskId;
+                    newUsageRecord.f_materialId = materialId;
+                    newUsageRecord.f_quantity = initialQuantity;
+                    newUsageRecord.f_timestamp = DateTime.Now;
+                    newUsageRecord.f_firestoreDocId = firestoreDocId;
+                    SaveData.Save();
+                }
+
+                var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
+                if (localMaterial != null)
+                {
+                    localMaterial.f_Stock -= initialQuantity;
+                    await synchronizerToFirebase.SynchronizeSingleSparePart(localMaterial);
+                    SaveData.Save();
+                }
+            }
+            // Nếu đã tồn tại thì không làm gì cả
         }
 
+        // Luôn cập nhật UI từ dữ liệu cục bộ đã được đồng bộ
         var combinedList = new List<Dictionary<string, object>>();
+        var localUsageRecords = E_UsageHistory.FindEntities(e => e.f_taskId == _currentTaskId);
 
-        if (_materialDataHandler.CurrentTaskMaterials != null)
+        foreach(var record in localUsageRecords)
         {
-            combinedList.AddRange(_materialDataHandler.CurrentTaskMaterials);
-        }
-
-        foreach(var item in _temporaryTaskMaterials.Values)
-        {
-             combinedList.Add((Dictionary<string, object>)item);
+            combinedList.Add(new Dictionary<string, object>
+            {
+                {"id", record.f_firestoreDocId},
+                {"materialId", record.f_materialId},
+                {"quantity", record.f_quantity},
+                {"timestamp", record.f_timestamp}
+            });
         }
         _materialUIManager.UpdateMaterialUsageUI(combinedList);
     }

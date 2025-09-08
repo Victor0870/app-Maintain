@@ -1,42 +1,40 @@
 using UnityEngine;
-using UnityEngine.UI; // For Button
-using TMPro; // Important: Add this if you are using TextMeshPro for your UI Text components
+using UnityEngine.UI;
+using TMPro;
 
 public class TaskItemUI : MonoBehaviour
 {
     [Header("UI References - Basic Display")]
-    public TextMeshProUGUI contentText; // Tên công việc
-    public TextMeshProUGUI locationText; // Vị trí làm việc
-    public TextMeshProUGUI createdByText; // Người yêu cầu
-    public TextMeshProUGUI timestampText; // Thời gian
-    public TextMeshProUGUI statusText; // NEW: Nhãn hiển thị trạng thái công việc
+    public TextMeshProUGUI contentText;
+    public TextMeshProUGUI locationText;
+    public TextMeshProUGUI createdByText;
+    public TextMeshProUGUI timestampText;
+    public TextMeshProUGUI statusText;
 
     [Header("UI References - Interaction")]
-    public Button taskItemButton; 
+    public Button taskItemButton;
 
-    // Phương thức này sẽ được gọi bởi TaskManager để thiết lập dữ liệu cơ bản cho mục
-    public void SetBasicTaskData(string content, string location, string createdBy, string timestamp, string status) // NEW: Thêm tham số status
+    public void SetBasicTaskData(string content, string location, string createdBy, string timestamp, string status)
     {
         if (contentText != null)
         {
-            contentText.text = "Tên công việc: " + content;
+            contentText.text = content; // Removed "Tên công việc: "
         }
         if (locationText != null)
         {
-            locationText.text = "Vị trí: " + location;
+            locationText.text = location; // Removed "Vị trí: "
         }
         if (createdByText != null)
         {
-            createdByText.text = "Người yêu cầu: " + createdBy;
+            createdByText.text = createdBy; // Removed "Người yêu cầu: "
         }
         if (timestampText != null)
         {
-            timestampText.text = "Thời gian: " + timestamp;
+            timestampText.text = timestamp; // Removed "Thời gian: "
         }
-        if (statusText != null) // NEW: Hiển thị trạng thái
+        if (statusText != null)
         {
-            statusText.text = "Trạng thái: " + status;
-            // Tùy chọn: Thay đổi màu sắc dựa trên trạng thái
+            statusText.text = status; // Removed "Trạng thái: "
             switch (status)
             {
                 case "Đang chờ":

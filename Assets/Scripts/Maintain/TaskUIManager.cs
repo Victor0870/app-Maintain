@@ -1,9 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using BansheeGz.BGDatabase;
 using System.Collections.Generic;
 using System;
 using System.Collections;
+using MySpace;
+using System.Linq;
+
 
 public class TaskUIManager
 {
@@ -14,23 +18,10 @@ public class TaskUIManager
     private Button _addTaskButton;
     private Button _closeDetailsButton;
 
-    private Toggle[] _sharedRiskToggles;
-    private string[] _riskNames = new string[]
-    {
-        "Làm việc trên cao",
-        "Làm việc trong không gian kín",
-        "Tiếp xúc hóa chất",
-        "Tiếp xúc bề mặt nóng",
-        "Thiết bị có áp suất cao",
-        "Có phát sinh tia lửa",
-        "Làm việc với thiết bị điện",
-        "Thiết bị quay, truyền động",
-        "Có vật bay",
-        "Làm việc với thiết bị nặng",
-        "Làm việc với cẩu",
-        "Rủi ro tràn dầu",
-        "Làm việc với vật sắc nhọn"
-    };
+    // Loại bỏ mảng hardcoded và thêm các biến cho dynamic generation
+    private GameObject _riskTogglePrefab;
+    private Transform _riskTogglesParent;
+    private List<Toggle> _dynamicRiskToggles = new List<Toggle>();
 
     private Transform _tasksListParent;
     private GameObject _taskItemPrefab;
@@ -79,7 +70,10 @@ public class TaskUIManager
     public TaskUIManager(
         TaskManager monoBehaviourContext,
         GameObject mainTaskPanel, TMP_InputField taskContentInput, TMP_InputField taskLocationInput, TMP_InputField taskDescriptionInput,
-        Button addTaskButton, Button closeDetailsButton, Toggle[] sharedRiskToggles, TextMeshProUGUI notificationText,
+        Button addTaskButton, Button closeDetailsButton,
+        // Thêm tham số cho prefab và parent
+        GameObject riskTogglePrefab, Transform riskTogglesParent,
+        TextMeshProUGUI notificationText,
         GameObject loadingIndicatorPanel, TextMeshProUGUI loadingPercentageText,
         Button showTaskListButton, GameObject taskListPanel, Button showInputPanelButton,
         TMP_Dropdown statusFilterDropdown, Transform tasksListParent, GameObject taskItemPrefab,
@@ -94,7 +88,11 @@ public class TaskUIManager
         _taskDescriptionInput = taskDescriptionInput;
         _addTaskButton = addTaskButton;
         _closeDetailsButton = closeDetailsButton;
-        _sharedRiskToggles = sharedRiskToggles;
+
+        // Gán prefab và parent mới
+        _riskTogglePrefab = riskTogglePrefab;
+        _riskTogglesParent = riskTogglesParent;
+
         _notificationText = notificationText;
         _loadingIndicatorPanel = loadingIndicatorPanel;
         _loadingPercentageText = loadingPercentageText;
@@ -125,22 +123,15 @@ public class TaskUIManager
             string content = _taskContentInput.text.Trim();
             string location = _taskLocationInput.text.Trim();
             string description = _taskDescriptionInput.text.Trim();
-            List<string> selectedRisks = new List<string>();
-            for (int i = 0; i < _sharedRiskToggles.Length; i++)
-            {
-                if (_sharedRiskToggles[i] != null && _sharedRiskToggles[i].isOn)
-                {
-                    selectedRisks.Add(_riskNames[i]);
-                }
-            }
-            OnAddTaskClicked?.Invoke(content, location, description, selectedRisks.ToArray());
+            List<int> selectedRiskIds = GetSelectedRiskIds();
+            OnAddTaskClicked?.Invoke(content, location, description, selectedRiskIds.Select(id => id.ToString()).ToArray());
         });
 
         if (_closeDetailsButton != null) _closeDetailsButton.onClick.AddListener(() => OnCloseDetailsClicked?.Invoke());
 
         if (_showTaskListButton != null) _showTaskListButton.onClick.AddListener(() => OnShowTaskListClicked?.Invoke());
 
-        if (_showInputPanelButton != null) _showInputPanelButton.onClick.AddListener(() => OnShowInputPanelClicked?.Invoke());
+        if (_showInputPanelButton != null) _showInputPanelButton.onClick.AddListener(() => OnShowInputPanelButtonClicked());
 
         if (_statusFilterDropdown != null)
         {
@@ -165,30 +156,34 @@ public class TaskUIManager
         if (_loadingIndicatorPanel != null) _loadingIndicatorPanel.SetActive(false);
         if (_mainTaskPanel != null) _mainTaskPanel.SetActive(false);
         if (_confirmPopupPanel != null) _confirmPopupPanel.SetActive(false);
-        if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(true); // Luôn hiển thị nút "Load More"
+        if (_loadMoreButton != null) _loadMoreButton.gameObject.SetActive(true);
 
         ShowInputView();
     }
 
     public void InitializeSharedRiskTogglesLabels()
     {
-        if (_sharedRiskToggles.Length != _riskNames.Length)
+        // Xóa các toggle cũ trước khi tạo mới
+        ClearToggles();
+        _dynamicRiskToggles.Clear();
+
+        List<E_Risk> allRisks = new List<E_Risk>();
+        E_Risk.ForEachEntity(entity => allRisks.Add(entity));
+
+        foreach (var risk in allRisks)
         {
-            Debug.LogError("Shared Risk Toggles array size does not match riskNames array in TaskUIManager.");
-            return;
+            GameObject newToggleObject = GameObject.Instantiate(_riskTogglePrefab, _riskTogglesParent);
+            Toggle newToggle = newToggleObject.GetComponent<Toggle>();
+            TextMeshProUGUI toggleLabel = newToggleObject.GetComponentInChildren<TextMeshProUGUI>();
+
+            if (toggleLabel != null)
+            {
+                toggleLabel.text = risk.f_name;
+            }
+
+            _dynamicRiskToggles.Add(newToggle);
         }
 
-        for (int i = 0; i < _sharedRiskToggles.Length; i++)
-        {
-            if (_sharedRiskToggles[i] != null)
-            {
-                TextMeshProUGUI toggleLabel = _sharedRiskToggles[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (toggleLabel != null)
-                {
-                    toggleLabel.text = _riskNames[i];
-                }
-            }
-        }
         if (_detailsStatusToggleLabel != null) _detailsStatusToggleLabel.text = TaskConstants.STATUS_PENDING + " / " + TaskConstants.STATUS_IN_PROGRESS;
     }
 
@@ -204,7 +199,7 @@ public class TaskUIManager
         if (_markAsDoneButton != null) _markAsDoneButton.gameObject.SetActive(false);
         if (_materialsButton != null) _materialsButton.gameObject.SetActive(false);
 
-        foreach (Toggle toggle in _sharedRiskToggles)
+        foreach (Toggle toggle in _dynamicRiskToggles)
         {
             if (toggle != null)
             {
@@ -227,7 +222,7 @@ public class TaskUIManager
         if (_markAsDoneButton != null) _markAsDoneButton.gameObject.SetActive(true);
         if (_materialsButton != null) _materialsButton.gameObject.SetActive(true);
 
-        foreach (Toggle toggle in _sharedRiskToggles)
+        foreach (Toggle toggle in _dynamicRiskToggles)
         {
             if (toggle != null)
             {
@@ -247,27 +242,40 @@ public class TaskUIManager
         _mainTaskPanel.SetActive(true);
         ShowDetailsView();
 
-        if (_taskContentInput != null) _taskContentInput.text = "Tên công việc: " + (taskData.TryGetValue("content", out object contentVal) ? contentVal.ToString() : "N/A");
-        if (_taskLocationInput != null) _taskLocationInput.text = "Vị trí: " + (taskData.TryGetValue("location", out object locationVal) ? locationVal.ToString() : "N/A");
-        if (_taskDescriptionInput != null) _taskDescriptionInput.text = "Mô tả chi tiết: " + (taskData.TryGetValue("description", out object descriptionVal) ? descriptionVal.ToString() : "N/A");
+        if (_taskContentInput != null) _taskContentInput.text =  (taskData.TryGetValue("content", out object contentVal) ? contentVal.ToString() : "N/A");
+        if (_taskLocationInput != null) _taskLocationInput.text = (taskData.TryGetValue("location", out object locationVal) ? locationVal.ToString() : "N/A");
+        if (_taskDescriptionInput != null) _taskDescriptionInput.text = (taskData.TryGetValue("description", out object descriptionVal) ? descriptionVal.ToString() : "N/A");
 
-        List<string> selectedRisks = new List<string>();
+        List<int> selectedRiskIds = new List<int>();
         if (taskData.TryGetValue("risks", out object risksObject) && risksObject is List<object> risksList)
         {
             foreach (object riskItem in risksList)
             {
-                selectedRisks.Add(riskItem.ToString());
+                if (riskItem is long riskIdLong)
+                {
+                    selectedRiskIds.Add((int)riskIdLong);
+                }
             }
         }
 
-        for (int i = 0; i < _sharedRiskToggles.Length; i++)
+        List<E_Risk> allRisks = new List<E_Risk>();
+        E_Risk.ForEachEntity(entity => allRisks.Add(entity));
+
+        // Ẩn tất cả các toggles trước
+        foreach(var toggle in _dynamicRiskToggles)
         {
-            if (_sharedRiskToggles[i] != null)
+            toggle.gameObject.SetActive(false);
+        }
+
+        // Chỉ hiển thị các toggle đã được chọn và thiết lập trạng thái
+        for (int i = 0; i < _dynamicRiskToggles.Count; i++)
+        {
+            int currentRiskId = allRisks[i].f_Id;
+            if (selectedRiskIds.Contains(currentRiskId))
             {
-                bool isSelected = selectedRisks.Contains(_riskNames[i]);
-                _sharedRiskToggles[i].gameObject.SetActive(isSelected);
-                _sharedRiskToggles[i].isOn = isSelected;
-                _sharedRiskToggles[i].interactable = false;
+                _dynamicRiskToggles[i].gameObject.SetActive(true);
+                _dynamicRiskToggles[i].isOn = true;
+                _dynamicRiskToggles[i].interactable = false;
             }
         }
 
@@ -304,6 +312,15 @@ public class TaskUIManager
         {
             _mainTaskPanel.SetActive(false);
             ShowInputView();
+        }
+    }
+
+    private void ClearToggles()
+    {
+        if (_riskTogglesParent == null) return;
+        foreach (Transform child in _riskTogglesParent)
+        {
+            GameObject.Destroy(child.gameObject);
         }
     }
 
@@ -524,5 +541,20 @@ public class TaskUIManager
         {
             _confirmPopupPanel.SetActive(false);
         }
+    }
+    private List<int> GetSelectedRiskIds()
+    {
+        List<int> selectedRiskIds = new List<int>();
+        List<E_Risk> allRisks = new List<E_Risk>();
+        E_Risk.ForEachEntity(entity => allRisks.Add(entity));
+
+        for (int i = 0; i < _dynamicRiskToggles.Count; i++)
+        {
+            if (_dynamicRiskToggles[i] != null && _dynamicRiskToggles[i].isOn)
+            {
+                selectedRiskIds.Add(allRisks[i].f_Id);
+            }
+        }
+        return selectedRiskIds;
     }
 }

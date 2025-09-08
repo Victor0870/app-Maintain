@@ -6,6 +6,7 @@ using MySpace;
 using BansheeGz.BGDatabase;
 using System.Threading.Tasks;
 using System.Linq;
+using System;
 
 public class MaterialManager : MonoBehaviour
 {
@@ -14,17 +15,20 @@ public class MaterialManager : MonoBehaviour
     public GameObject sparePartListPanel;
     public GameObject materialUsagePanel;
     public GameObject materialSelectPanel;
+    public GameObject confirmPanel;
 
     [Header("UI Buttons")]
     public Button showListButton;
     public Button showPurchaseButton;
     public Button closeListButton;
+    public Button confirmYesButton;
+    public Button confirmNoButton;
 
     [Header("UI Elements - List Panel")]
     public Transform materialsListParent;
     public GameObject materialItemPrefab;
 
-    [Header("UI Elements - Select Panel")] // Thêm parent riêng
+    [Header("UI Elements - Select Panel")]
     public Transform materialSelectParent;
     public GameObject materialSelectPanelItemPrefab;
 
@@ -48,8 +52,6 @@ public class MaterialManager : MonoBehaviour
     public Button addNewUsageButton;
     public Button confirmUsageButton;
 
-    // Biến công khai để tham chiếu đến script BGDatabaseToFirebaseSynchronizer.
-    // Gán biến này bằng cách kéo và thả trong Unity Editor.
     public BGDatabaseToFirebaseSynchronizer synchronizerToFirebase;
 
     private List<E_SparePart> _allMaterials = new List<E_SparePart>();
@@ -63,6 +65,7 @@ public class MaterialManager : MonoBehaviour
 
     async void Start()
     {
+        SaveData.Load();
         if (FirebaseManager.Instance == null || FirebaseManager.Instance.db == null)
         {
             Debug.LogError("FirebaseManager chưa được khởi tạo hoặc Firebase chưa sẵn sàng. Thử lại sau 1 giây.");
@@ -77,7 +80,6 @@ public class MaterialManager : MonoBehaviour
             return;
         }
 
-        // Thêm dòng này để tự động tìm và gán tham chiếu đến synchronizerToFirebase
         synchronizerToFirebase = FindObjectOfType<BGDatabaseToFirebaseSynchronizer>();
         if (synchronizerToFirebase == null)
         {
@@ -91,7 +93,8 @@ public class MaterialManager : MonoBehaviour
             sparePartListPanel, materialSelectPanel, materialsListParent, materialSelectParent, materialItemPrefab, materialSelectPanelItemPrefab,
             closeListButton, searchInputField, typeFilterDropdown, locationFilterDropdown, categoryFilterDropdown,
             materialUsagePanel, usageListParent, usageItemPrefab, closeUsagePanelButton, addNewUsageButton, confirmUsageButton,
-            selectSearchInputField, selectTypeFilterDropdown, selectLocationFilterDropdown, selectCategoryFilterDropdown
+            selectSearchInputField, selectTypeFilterDropdown, selectLocationFilterDropdown, selectCategoryFilterDropdown,
+            confirmPanel, confirmYesButton, confirmNoButton
         );
 
         if (showListButton != null) showListButton.onClick.AddListener(HandleShowListClicked);
@@ -104,6 +107,7 @@ public class MaterialManager : MonoBehaviour
             _materialUIManager.OnConfirmUsageClicked += HandleConfirmUsageClicked;
             _materialUIManager.OnAddMaterialToTaskClicked += HandleAddMaterialToTaskClicked;
             _materialUIManager.OnQuantityChanged += HandleQuantityChanged;
+            _materialUIManager.OnRemoveMaterialConfirmed += HandleRemoveMaterialConfirmed;
         }
 
         if (_materialDataHandler != null)
@@ -114,14 +118,26 @@ public class MaterialManager : MonoBehaviour
         if (sparePartListPanel != null) sparePartListPanel.SetActive(false);
         if (materialUsagePanel != null) materialUsagePanel.SetActive(false);
         if (materialSelectPanel != null) materialSelectPanel.SetActive(false);
+        if (confirmPanel != null) confirmPanel.SetActive(false);
 
-        LoadAllMaterialsFromBGDatabase();
 
-        bool syncSuccess = await _synchronizer.SynchronizeSparePartsFromFirebase();
+
+        DateTime latestLocalTimestamp = DateTime.MinValue;
+        if (E_SparePart.CountEntities > 0)
+        {
+            latestLocalTimestamp = E_SparePart.FindEntities(entity => entity.f_lastUpdate > DateTime.MinValue)
+                .OrderByDescending(entity => entity.f_lastUpdate)
+                .FirstOrDefault()?.f_lastUpdate ?? DateTime.MinValue;
+        }
+
+        bool syncSuccess = await _synchronizer.SynchronizeSparePartsFromFirebase(latestLocalTimestamp);
+
         if (syncSuccess)
         {
             LoadAllMaterialsFromBGDatabase();
             PopulateFilterDropdowns();
+            SaveData.Save();
+            Debug.Log("Đã lưu dữ liệu vào bộ nhớ cục bộ.");
         }
     }
 
@@ -175,6 +191,7 @@ public class MaterialManager : MonoBehaviour
             _materialUIManager.OnConfirmUsageClicked -= HandleConfirmUsageClicked;
             _materialUIManager.OnAddMaterialToTaskClicked -= HandleAddMaterialToTaskClicked;
             _materialUIManager.OnQuantityChanged -= HandleQuantityChanged;
+            _materialUIManager.OnRemoveMaterialConfirmed -= HandleRemoveMaterialConfirmed;
         }
 
         if (_materialDataHandler != null)
@@ -183,6 +200,37 @@ public class MaterialManager : MonoBehaviour
         }
 
         _materialDataHandler.StopListeningForTaskMaterials();
+    }
+
+    private async void HandleRemoveMaterialConfirmed(string materialId)
+    {
+        // Kiểm tra xem vật tư có tồn tại trên Firestore hay không trước khi xóa
+        var existingUsageItem = _materialDataHandler.CurrentTaskMaterials.FirstOrDefault(m => m.TryGetValue("materialId", out object id) && id.ToString() == materialId);
+
+        // Xóa vật tư khỏi Firebase trước
+        if (existingUsageItem != null)
+        {
+            // Sử dụng ID của tài liệu để xóa
+            string firestoreDocId = existingUsageItem.TryGetValue("id", out object docId) ? docId.ToString() : null;
+            if (!string.IsNullOrEmpty(firestoreDocId))
+            {
+                await _materialDataHandler.DeleteMaterialUsage(_currentTaskId, firestoreDocId);
+            }
+        }
+
+        // Cập nhật stock cục bộ và đồng bộ lên Firebase
+        var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
+        if (localMaterial != null)
+        {
+            localMaterial.f_Stock += 1;
+            await synchronizerToFirebase.SynchronizeSingleSparePart(localMaterial);
+            SaveData.Save();
+            Debug.Log("Đã lưu dữ liệu vào bộ nhớ cục bộ sau khi xóa vật tư và tăng stock.");
+        }
+
+        // Xóa khỏi danh sách tạm thời và cập nhật UI cuối cùng
+        _temporaryTaskMaterials.Remove(materialId);
+        _materialUIManager.RemoveTemporaryMaterial(materialId);
     }
 
     public void ShowMaterialUsagePanel(string taskId)
@@ -244,22 +292,20 @@ public class MaterialManager : MonoBehaviour
 
         foreach (var item in allUsageItems)
         {
-            // Kiểm tra xem vật tư này đã tồn tại trên Firestore hay chưa
             if (existingTaskMaterials.Contains(item.materialId))
             {
-                // Nếu vật tư đã tồn tại và có sự thay đổi
                 if (item.changeType != MaterialUIManager.ChangeType.NoChange)
                 {
                     int quantityChange = item.quantity - item.oldQuantity;
                     if (quantityChange != 0)
                     {
-                        // Cập nhật stock cục bộ (BGDatabase)
                         var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == item.materialId);
                         if (localMaterial != null)
                         {
                             localMaterial.f_Stock -= quantityChange;
-                            // Đồng bộ vật tư cụ thể vừa thay đổi lên Firebase
                             await synchronizerToFirebase.SynchronizeSingleSparePart(localMaterial);
+                            SaveData.Save();
+                            Debug.Log("Đã lưu dữ liệu vào bộ nhớ cục bộ sau khi cập nhật stock.");
                         }
                     }
                     await _materialDataHandler.UpdateMaterialUsage(_currentTaskId, item.materialId, item.quantity, item.changeType);
@@ -267,14 +313,14 @@ public class MaterialManager : MonoBehaviour
             }
             else
             {
-                // Nếu là vật tư mới, thêm vào Firestore và trừ stock cục bộ
                 await _materialDataHandler.AddMaterialToTask(_currentTaskId, item.materialId, item.quantity);
                 var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == item.materialId);
                 if (localMaterial != null)
                 {
                     localMaterial.f_Stock -= item.quantity;
-                    // Đồng bộ vật tư cụ thể vừa thay đổi lên Firebase
                     await synchronizerToFirebase.SynchronizeSingleSparePart(localMaterial);
+                    SaveData.Save();
+                    Debug.Log("Đã lưu dữ liệu vào bộ nhớ cục bộ sau khi thêm mới vật tư.");
                 }
             }
         }

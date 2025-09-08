@@ -108,6 +108,28 @@ public class MaterialDataHandler
         }
     }
 
+    // THÊM PHƯƠNG THỨC MỚI ĐỂ XÓA TÀI LIỆU SỬ DỤNG VẬT TƯ
+    public async Task DeleteMaterialUsage(string taskId, string materialId)
+    {
+        if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(materialId))
+        {
+            Debug.LogError("Task ID hoặc Material ID không hợp lệ.");
+            return;
+        }
+
+        try
+        {
+            var taskMaterialDocRef = FirebasePathUtils.GetTaskMaterialsCollection(_canvasAppId, _db, taskId)
+                                                     .Document(materialId);
+            await taskMaterialDocRef.DeleteAsync();
+            Debug.Log($"Đã xóa vật tư {materialId} khỏi công việc {taskId} trên Firestore.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Lỗi khi xóa vật tư: {ex.Message}");
+        }
+    }
+
     public async Task UpdateMaterialStock(string taskId, string materialId, int quantityChange)
     {
         if (!int.TryParse(materialId, out int materialNo))

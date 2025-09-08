@@ -33,9 +33,14 @@ public class MaterialUIManager
     private Button _addNewUsageButton;
     private Button _confirmUsageButton;
 
+    // Thêm các biến cho panel xác nhận xóa
+    private GameObject _confirmPanel;
+    private Button _confirmYesButton;
+    private Button _confirmNoButton;
+
     private Dictionary<string, MaterialUsageItemUI> _currentUsageItems = new Dictionary<string, MaterialUsageItemUI>();
 
-    public enum ChangeType { NoChange, Added, Increased, Decreased }
+    public enum ChangeType { NoChange, Added, Increased, Decreased, Removed } // Thêm trạng thái Removed
 
     public event Action<string, string, string, string> OnSearchOrFilterChanged;
     public event Action OnCloseListPanelClicked;
@@ -44,6 +49,8 @@ public class MaterialUIManager
     public event Action OnConfirmUsageClicked;
     public event Action<string, int> OnAddMaterialToTaskClicked;
     public event Action<string, int, int> OnQuantityChanged;
+    // Sự kiện mới để gửi yêu cầu xóa từ UI lên Manager
+    public event Action<string> OnRemoveMaterialConfirmed;
 
     public MaterialUIManager(
         GameObject sparePartListPanel,
@@ -66,7 +73,10 @@ public class MaterialUIManager
         TMP_InputField selectSearchInputField,
         TMP_Dropdown selectTypeFilterDropdown,
         TMP_Dropdown selectLocationFilterDropdown,
-        TMP_Dropdown selectCategoryFilterDropdown
+        TMP_Dropdown selectCategoryFilterDropdown,
+        GameObject confirmPanel, // Thêm panel xác nhận
+        Button confirmYesButton,
+        Button confirmNoButton
     )
     {
         _sparePartListPanel = sparePartListPanel;
@@ -92,6 +102,10 @@ public class MaterialUIManager
         _selectLocationFilterDropdown = selectLocationFilterDropdown;
         _selectCategoryFilterDropdown = selectCategoryFilterDropdown;
 
+        _confirmPanel = confirmPanel;
+        _confirmYesButton = confirmYesButton;
+        _confirmNoButton = confirmNoButton;
+
         SetupUIListeners();
     }
 
@@ -110,6 +124,34 @@ public class MaterialUIManager
         if (_selectTypeFilterDropdown != null) _selectTypeFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
         if (_selectLocationFilterDropdown != null) _selectLocationFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
         if (_selectCategoryFilterDropdown != null) _selectCategoryFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
+
+        if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(HideConfirmPanel);
+    }
+
+    // Thêm phương thức để hiển thị panel xác nhận
+    public void ShowConfirmPanel(string materialId)
+    {
+        if (_confirmPanel != null)
+        {
+            _confirmPanel.SetActive(true);
+            // Gán listener cho nút "Yes" để xác nhận xóa
+            if (_confirmYesButton != null)
+            {
+                _confirmYesButton.onClick.RemoveAllListeners();
+                _confirmYesButton.onClick.AddListener(() => {
+                    OnRemoveMaterialConfirmed?.Invoke(materialId);
+                    HideConfirmPanel();
+                });
+            }
+        }
+    }
+
+    public void HideConfirmPanel()
+    {
+        if (_confirmPanel != null)
+        {
+            _confirmPanel.SetActive(false);
+        }
     }
 
     private void TriggerSearchOrFilter()
@@ -232,6 +274,16 @@ public class MaterialUIManager
         return _currentUsageItems.Values.ToList();
     }
 
+    // Thêm phương thức để xóa một vật tư khỏi danh sách tạm
+    public void RemoveTemporaryMaterial(string materialId)
+    {
+        if (_currentUsageItems.ContainsKey(materialId))
+        {
+            GameObject.Destroy(_currentUsageItems[materialId].gameObject);
+            _currentUsageItems.Remove(materialId);
+        }
+    }
+
     private void DisplayMaterial(E_SparePart materialData, bool isSelectPanel)
     {
         GameObject prefabToUse = isSelectPanel ? _materialSelectPanelItemPrefab : _materialItemPrefab;
@@ -283,6 +335,8 @@ public class MaterialUIManager
 
             itemScript.OnIncreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
             itemScript.OnDecreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
+            // Thêm listener cho sự kiện mới
+            itemScript.OnRemoveItemRequest += ShowConfirmPanel;
         }
     }
 

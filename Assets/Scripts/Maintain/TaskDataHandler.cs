@@ -1,22 +1,16 @@
 using Firebase.Firestore;
+using BansheeGz.BGDatabase;
 using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
+using MySpace;
 
 public class TaskDataHandler
 {
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
-    private ListenerRegistration _inProgressTasksListener;
-    private bool _initialLoadComplete = false;
-    private DocumentSnapshot _lastDocumentSnapshot = null;
-    private readonly int _pageSize = 10;
-    private ListenerRegistration _tasksListener;
-    private string _currentFilterStatus;
-    private bool _isFirstLoad = true;
-
 
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
@@ -29,140 +23,50 @@ public class TaskDataHandler
         _canvasAppId = canvasAppId;
     }
 
-    public DocumentReference GetTaskDocument(string taskId)
+    public void LoadFilteredTasksFromLocal(string filterStatus)
     {
-        return _db.Collection("artifacts")
-            .Document(_canvasAppId)
-            .Collection("public")
-            .Document("data")
-            .Collection("tasks")
-            .Document(taskId);
-    }
-
-    public CollectionReference GetTaskMaterialsCollection(string taskId)
-    {
-        return GetTaskDocument(taskId).Collection("materials");
-    }
-
-    public void StartListeningForTasks(string filterStatus = TaskConstants.STATUS_ALL)
-    {
-        StopListeningForFilteredTasks();
-
-        _currentFilterStatus = filterStatus;
-        _isFirstLoad = true;
-        _lastDocumentSnapshot = null;
-        LoadTasksWithPagination();
-    }
-
-    public async void LoadTasksWithPagination()
-    {
-        if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
+        List<E_Task> tasksFromLocal;
+        if (filterStatus == TaskConstants.STATUS_ALL)
         {
-            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể tải các công việc.");
-            return;
+            tasksFromLocal = E_Task.FindEntities(entity => true).ToList();
+        }
+        else
+        {
+            tasksFromLocal = E_Task.FindEntities(entity => entity.f_status == filterStatus).ToList();
         }
 
-        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
-            .Document(_canvasAppId)
-            .Collection("public")
-            .Document("data")
-            .Collection("tasks");
+        List<Dictionary<string, object>> tasksAsDictionaries = ConvertTasksToDictionaryList(tasksFromLocal);
+        OnFilteredTasksChanged?.Invoke(tasksAsDictionaries);
+    }
 
-        Query q = tasksCollectionRef.OrderByDescending("timestamp");
+    public void LoadInProgressTasksFromLocal()
+    {
+        List<E_Task> inProgressTasks = E_Task.FindEntities(entity => entity.f_status == TaskConstants.STATUS_IN_PROGRESS).ToList();
+        List<Dictionary<string, object>> tasksAsDictionaries = ConvertTasksToDictionaryList(inProgressTasks);
+        OnInProgressTasksChanged?.Invoke(tasksAsDictionaries);
+    }
 
-        if (_currentFilterStatus != TaskConstants.STATUS_ALL)
+    private List<Dictionary<string, object>> ConvertTasksToDictionaryList(List<E_Task> tasks)
+    {
+        List<Dictionary<string, object>> taskDictList = new List<Dictionary<string, object>>();
+        foreach(var task in tasks)
         {
-            q = q.WhereEqualTo("status", _currentFilterStatus);
-        }
+            Timestamp lastUpdatedTimestamp = Timestamp.FromDateTime(task.f_lastUpdated);
 
-        if (_lastDocumentSnapshot != null)
-        {
-            q = q.StartAfter(_lastDocumentSnapshot);
-        }
-
-        q = q.Limit(_pageSize);
-
-        try
-        {
-            QuerySnapshot snapshot = await q.GetSnapshotAsync();
-            List<Dictionary<string, object>> tasks = new List<Dictionary<string, object>>();
-
-            foreach (DocumentSnapshot document in snapshot.Documents)
+            var dict = new Dictionary<string, object>
             {
-                Dictionary<string, object> taskData = document.ToDictionary();
-                taskData["id"] = document.Id;
-                tasks.Add(taskData);
-            }
-
-            if (snapshot.Documents.Count() > 0)
-            {
-                _lastDocumentSnapshot = snapshot.Documents.ElementAt(snapshot.Documents.Count() - 1);
-            }
-
-            OnFilteredTasksChanged?.Invoke(tasks);
-
-            if (_isFirstLoad)
-            {
-                _isFirstLoad = false;
-                OnInitialLoadComplete?.Invoke();
-            }
+                {"id", task.f_Id},
+                {"content", task.f_name},
+                {"location", task.f_location},
+                {"description", task.f_description},
+                {"createdBy", task.f_createdBy},
+                {"status", task.f_status},
+                {"risks", task.f_risks?.Select(id => (object)(long)id).ToList() ?? new List<object>()},
+                {"lastUpdated", lastUpdatedTimestamp}
+            };
+            taskDictList.Add(dict);
         }
-        catch (Exception ex)
-        {
-            Debug.LogError("Lỗi khi tải công việc: " + ex.Message);
-        }
-    }
-
-    public void StartListeningForInProgressTasks()
-    {
-        if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
-        {
-            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể bắt đầu lắng nghe các công việc.");
-            return;
-        }
-
-        StopListeningForInProgressTasks();
-
-        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
-            .Document(_canvasAppId)
-            .Collection("public")
-            .Document("data")
-            .Collection("tasks");
-
-        Query q = tasksCollectionRef.WhereEqualTo("status", TaskConstants.STATUS_IN_PROGRESS).OrderByDescending("timestamp");
-
-        _inProgressTasksListener = q.Listen(snapshot =>
-        {
-            List<Dictionary<string, object>> inProgressTasks = new List<Dictionary<string, object>>();
-            foreach (DocumentSnapshot document in snapshot.Documents)
-            {
-                Dictionary<string, object> taskData = document.ToDictionary();
-                taskData["id"] = document.Id;
-                inProgressTasks.Add(taskData);
-            }
-            OnInProgressTasksChanged?.Invoke(inProgressTasks);
-        });
-        Debug.Log("Đã bắt đầu lắng nghe riêng cho danh sách 'Đang làm'.");
-    }
-
-    public void StopListeningForFilteredTasks()
-    {
-        if (_tasksListener != null)
-        {
-            _tasksListener.Stop();
-            _tasksListener = null;
-            Debug.Log("Đã dừng lắng nghe cập nhật công việc đã lọc.");
-        }
-    }
-
-    public void StopListeningForInProgressTasks()
-    {
-        if (_inProgressTasksListener != null)
-        {
-            _inProgressTasksListener.Stop();
-            _inProgressTasksListener = null;
-            Debug.Log("Đã dừng lắng nghe cập nhật công việc 'Đang làm'.");
-        }
+        return taskDictList;
     }
 
     public async void AddTask(string content, string location, string description, string[] selectedRisks, string createdBy)
@@ -179,33 +83,75 @@ public class TaskDataHandler
             return;
         }
 
+        List<int> riskIds = new List<int>();
+        foreach (var riskIdString in selectedRisks)
+        {
+            if (int.TryParse(riskIdString, out int riskId))
+            {
+                riskIds.Add(riskId);
+            }
+        }
+
+        E_Task newTaskEntity = E_Task.NewEntity();
+        newTaskEntity.f_name = content;
+        newTaskEntity.f_location = location;
+        newTaskEntity.f_description = description;
+        newTaskEntity.f_createdBy = createdBy;
+        newTaskEntity.f_status = TaskConstants.STATUS_PENDING;
+        newTaskEntity.f_risks = new List<int>(riskIds);
+
+        newTaskEntity.f_lastUpdated = DateTime.Now;
+
+        SaveData.Save();
+
+        await SyncTaskToFirebase(newTaskEntity);
+
+        OnNewTaskAdded?.Invoke(content, location);
+    }
+
+    public async Task SyncTaskToFirebase(E_Task localTask)
+    {
+        if (_db == null)
+        {
+            Debug.LogError("Firebase not initialized in TaskDataHandler.");
+            return;
+        }
+
+        CollectionReference tasksCollectionRef = _db.Collection("artifacts")
+            .Document(_canvasAppId)
+            .Collection("public")
+            .Document("data")
+            .Collection("tasks");
+
+        Timestamp lastUpdatedTimestamp = Timestamp.FromDateTime(localTask.f_lastUpdated);
+
         Dictionary<string, object> taskData = new Dictionary<string, object>
         {
-            { "content", content },
-            { "location", location },
-            { "description", description },
-            { "timestamp", FieldValue.ServerTimestamp },
-            { "createdBy", createdBy },
-            { "risks", selectedRisks },
-            { "status", TaskConstants.STATUS_PENDING }
+            { "content", localTask.f_name },
+            { "location", localTask.f_location },
+            { "description", localTask.f_description },
+            { "timestamp", lastUpdatedTimestamp },
+            { "createdBy", localTask.f_createdBy },
+            { "risks", localTask.f_risks?.Select(id => (long)id).ToList() ?? new List<long>() },
+            { "status", localTask.f_status },
+            { "lastUpdated", lastUpdatedTimestamp }
         };
 
         try
         {
-            CollectionReference tasksCollectionRef = _db.Collection("artifacts")
-                .Document(_canvasAppId)
-                .Collection("public")
-                .Document("data")
-                .Collection("tasks");
+            DocumentReference newDocRef = await tasksCollectionRef.AddAsync(taskData);
 
-            await tasksCollectionRef.AddAsync(taskData);
-            Debug.Log("Task added successfully to Firestore!");
+            localTask.f_Id = newDocRef.Id;
+            SaveData.Save();
+
+            Debug.Log($"Task added successfully to Firestore with ID: {newDocRef.Id}");
         }
         catch (Exception ex)
         {
             Debug.LogError("Error adding task to Firestore: " + ex.Message);
         }
     }
+
 
     public async void UpdateTaskStatus(string taskId, string newStatus)
     {
@@ -215,6 +161,14 @@ public class TaskDataHandler
             return;
         }
 
+        var localTask = E_Task.FindEntity(entity => entity.f_Id == taskId);
+        if (localTask != null)
+        {
+            localTask.f_status = newStatus;
+            localTask.f_lastUpdated = DateTime.Now;
+            SaveData.Save();
+        }
+
         DocumentReference taskDocRef = _db.Collection("artifacts")
             .Document(_canvasAppId)
             .Collection("public")
@@ -222,10 +176,12 @@ public class TaskDataHandler
             .Collection("tasks")
             .Document(taskId);
 
+        Timestamp lastUpdatedTimestamp = Timestamp.FromDateTime(DateTime.Now);
+
         Dictionary<string, object> updates = new Dictionary<string, object>
         {
             { "status", newStatus },
-            { "lastUpdated", FieldValue.ServerTimestamp }
+            { "lastUpdated", lastUpdatedTimestamp }
         };
 
         try
@@ -240,6 +196,9 @@ public class TaskDataHandler
     }
     public void LoadMoreTasks()
     {
-        LoadTasksWithPagination();
+        // Khi sử dụng BGDatabase, không cần hàm này vì tất cả dữ liệu đã được tải.
     }
+
+    public void StopListeningForFilteredTasks() {}
+    public void StopListeningForInProgressTasks() {}
 }

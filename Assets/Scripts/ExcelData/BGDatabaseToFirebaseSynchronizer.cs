@@ -5,61 +5,71 @@ using MySpace;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
+using System;
 
 public class BGDatabaseToFirebaseSynchronizer : MonoBehaviour
 {
     public async Task SynchronizeSingleSparePart(E_SparePart localItem)
-       {
-           Debug.Log($"Đang bắt đầu đồng bộ hóa vật tư {localItem.f_name} (No: {localItem.f_No}) lên Firebase...");
+    {
+        Debug.Log($"Đang bắt đầu đồng bộ hóa vật tư {localItem.f_name} (No: {localItem.f_No}) lên Firebase...");
 
-           if (FirebaseManager.Instance == null || FirebaseManager.Instance.db == null)
-           {
-               Debug.LogError("Firebase không sẵn sàng. Vui lòng kiểm tra FirebaseManager.");
-               return;
-           }
+        if (FirebaseManager.Instance == null || FirebaseManager.Instance.db == null)
+        {
+            Debug.LogError("Firebase không sẵn sàng. Vui lòng kiểm tra FirebaseManager.");
+            return;
+        }
 
-           if (string.IsNullOrEmpty(localItem.f_materialID))
-           {
-               Debug.LogError("Không có Document ID của Firebase. Không thể đồng bộ hóa.");
-               return;
-           }
+        if (string.IsNullOrEmpty(localItem.f_materialID))
+        {
+            Debug.LogError("Không có Document ID của Firebase. Không thể đồng bộ hóa.");
+            return;
+        }
 
-           // 1. Lấy tham chiếu đến tài liệu trên Firebase bằng Document ID
-           CollectionReference materialsCollection = FirebaseManager.Instance.db
-               .Collection("artifacts")
-               .Document(FirebaseManager.Instance.GetCanvasAppId())
-               .Collection("public")
-               .Document("data")
-               .Collection("materials");
+        CollectionReference materialsCollection = FirebaseManager.Instance.db
+            .Collection("artifacts")
+            .Document(FirebaseManager.Instance.GetCanvasAppId())
+            .Collection("public")
+            .Document("data")
+            .Collection("materials");
 
-           var firebaseDocRef = materialsCollection.Document(localItem.f_materialID);
+        var firebaseDocRef = materialsCollection.Document(localItem.f_materialID);
 
-           // 2. Cập nhật các trường dữ liệu trên Firebase
-           var updates = new Dictionary<string, object>
-           {
-               { "No", localItem.f_No.ToString() }, // Lưu dưới dạng chuỗi
-               { "name", localItem.f_name },
-               { "purpose", localItem.f_Purpose },
-               { "type", localItem.f_Type },
-               { "unit", localItem.f_Unit },
-               { "stock", localItem.f_Stock },
-               { "location", localItem.f_Location },
-               { "category", localItem.f_Category },
-               { "lastUpdated", FieldValue.ServerTimestamp }
-           };
+        // 1. Lấy dấu thời gian hiện tại của máy cục bộ
+        DateTime now = DateTime.Now;
 
-           try
-           {
-               await firebaseDocRef.UpdateAsync(updates);
-               Debug.Log($"Đã cập nhật thành công mục '{localItem.f_name}' (ID: {localItem.f_materialID}) trên Firebase.");
-           }
-           catch (System.Exception ex)
-           {
-               Debug.LogError($"Lỗi khi cập nhật tài liệu {localItem.f_materialID}: {ex.Message}");
-           }
+        // 2. Cập nhật f_lastUpdate cục bộ với dấu thời gian này và lưu lại
+        localItem.f_lastUpdate = now;
+        SaveData.Save(); // Đảm bảo thay đổi cục bộ được lưu
 
-           Debug.Log("Quá trình đồng bộ hóa đã hoàn tất.");
-       }
+        // 3. Chuyển đổi DateTime sang Firebase.Firestore.Timestamp để gửi lên Firebase
+        Timestamp serverTimestamp = Timestamp.FromDateTime(now.ToUniversalTime());
+
+        var updates = new Dictionary<string, object>
+        {
+            { "No", localItem.f_No.ToString() },
+            { "name", localItem.f_name },
+            { "purpose", localItem.f_Purpose },
+            { "type", localItem.f_Type },
+            { "unit", localItem.f_Unit },
+            { "stock", localItem.f_Stock },
+            { "location", localItem.f_Location },
+            { "category", localItem.f_Category },
+            { "lastUpdated", serverTimestamp } // Gửi dấu thời gian đã được chuẩn hóa
+        };
+
+        try
+        {
+            // 4. Cập nhật các trường dữ liệu trên Firebase
+            await firebaseDocRef.UpdateAsync(updates);
+            Debug.Log($"Đã cập nhật thành công mục '{localItem.f_name}' (ID: {localItem.f_materialID}) trên Firebase.");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"Lỗi khi cập nhật tài liệu {localItem.f_materialID}: {ex.Message}");
+        }
+
+        Debug.Log("Quá trình đồng bộ hóa đã hoàn tất.");
+    }
     public async void SynchronizeSparePartsData()
     {
         Debug.Log("Đang bắt đầu đồng bộ hóa dữ liệu từ BGDatabase lên Firebase...");

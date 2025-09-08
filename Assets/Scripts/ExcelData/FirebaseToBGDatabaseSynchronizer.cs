@@ -4,12 +4,16 @@ using BansheeGz.BGDatabase;
 using MySpace;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System;
+using System.Linq;
 
 public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
 {
-    public async Task<bool> SynchronizeSparePartsFromFirebase()
+    // Thêm tham số lastSyncTimestamp để chỉ tải dữ liệu mới
+    public async Task<bool> SynchronizeSparePartsFromFirebase(DateTime lastSyncTimestamp)
     {
         Debug.Log("Đang đồng bộ hóa dữ liệu từ Firebase xuống BGDatabase...");
+        Debug.Log($"Thời gian đồng bộ cuối cùng cục bộ: {lastSyncTimestamp}");
 
         if (FirebaseManager.Instance == null || FirebaseManager.Instance.db == null)
         {
@@ -26,7 +30,10 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
 
         try
         {
-            QuerySnapshot firebaseSnapshot = await materialsCollection.GetSnapshotAsync();
+            // Thay đổi truy vấn để chỉ lấy các tài liệu có dấu thời gian mới hơn
+            Query query = materialsCollection.WhereGreaterThan("lastUpdated", lastSyncTimestamp);
+            QuerySnapshot firebaseSnapshot = await query.GetSnapshotAsync();
+
             var firebaseDataByNo = new Dictionary<string, (Dictionary<string, object> data, string docId)>();
             foreach (DocumentSnapshot doc in firebaseSnapshot.Documents)
             {
@@ -36,6 +43,7 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                 }
             }
 
+            // Lấy tất cả các entity cục bộ để so sánh
             var localEntitiesByNo = new Dictionary<string, E_SparePart>();
             E_SparePart.ForEachEntity(entity =>
             {
@@ -53,8 +61,19 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                     var localEntity = localEntitiesByNo[itemNo];
                     bool needsUpdate = false;
 
-                    // Thêm dòng này để lưu Document ID vào BGDatabase
+                    // Cập nhật trường f_materialID
                     if (!string.Equals(localEntity.f_materialID, firebaseDocId)) { localEntity.f_materialID = firebaseDocId; needsUpdate = true; }
+
+                    // Cập nhật trường f_lastUpdate
+                    if (firebaseItem.TryGetValue("lastUpdated", out object lastUpdatedObj) && lastUpdatedObj is Timestamp firebaseTimestamp)
+                    {
+                        DateTime newTimestamp = firebaseTimestamp.ToDateTime();
+                        if (localEntity.f_lastUpdate != newTimestamp)
+                        {
+                            localEntity.f_lastUpdate = newTimestamp;
+                            needsUpdate = true;
+                        }
+                    }
 
                     // ... (Các đoạn mã so sánh và cập nhật khác)
                     string name = firebaseItem.TryGetValue("name", out object nameVal) ? (nameVal?.ToString() ?? "") : "";
@@ -87,7 +106,18 @@ public class FirebaseToBGDatabaseSynchronizer : MonoBehaviour
                 {
                     E_SparePart newEntity = E_SparePart.NewEntity();
                     newEntity.f_No = int.Parse(itemNo);
-                    newEntity.f_materialID = firebaseDocId; // Thêm dòng này cho vật tư mới
+                    newEntity.f_materialID = firebaseDocId;
+
+                    // Thêm trường f_lastUpdate khi tạo mới
+                    if (firebaseItem.TryGetValue("lastUpdated", out object lastUpdatedObj) && lastUpdatedObj is Timestamp firebaseTimestamp)
+                    {
+                        newEntity.f_lastUpdate = firebaseTimestamp.ToDateTime();
+                    }
+                    else
+                    {
+                        newEntity.f_lastUpdate = DateTime.MinValue;
+                    }
+
                     newEntity.f_name = firebaseItem.TryGetValue("name", out object nameVal) ? (nameVal?.ToString() ?? "") : "";
                     newEntity.f_Purpose = firebaseItem.TryGetValue("purpose", out object purposeVal) ? (purposeVal?.ToString() ?? "") : "";
                     newEntity.f_Type = firebaseItem.TryGetValue("type", out object typeVal) ? (typeVal?.ToString() ?? "") : "";

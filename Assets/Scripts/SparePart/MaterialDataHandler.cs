@@ -55,7 +55,6 @@ public class MaterialDataHandler
         }
     }
 
-    // THAY ĐỔI: Trả về ID tài liệu Firestore
     public async Task<string> AddMaterialToTask(string taskId, string materialId, int initialQuantity)
     {
         if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(materialId))
@@ -69,7 +68,7 @@ public class MaterialDataHandler
             { "materialId", materialId },
             { "quantity", initialQuantity },
             { "timestamp", FieldValue.ServerTimestamp },
-            { "status", "Đã sử dụng" } // Thêm trạng thái mặc định
+            { "status", "Đã sử dụng" }
         };
 
         try
@@ -85,7 +84,6 @@ public class MaterialDataHandler
         }
     }
 
-    // THAY ĐỔI: Chấp nhận firestoreDocId thay vì materialId
     public async Task UpdateMaterialUsage(string taskId, string firestoreDocId, int newQuantity)
     {
         if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(firestoreDocId))
@@ -112,7 +110,6 @@ public class MaterialDataHandler
         }
     }
 
-    // THAY ĐỔI: Chấp nhận firestoreDocId thay vì materialId
     public async Task DeleteMaterialUsage(string taskId, string firestoreDocId)
     {
         if (string.IsNullOrEmpty(taskId) || string.IsNullOrEmpty(firestoreDocId))
@@ -134,7 +131,30 @@ public class MaterialDataHandler
         }
     }
 
-    // Phương thức này có vẻ không được sử dụng, nhưng vẫn giữ lại để hoàn chỉnh
+    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier, string poNumber)
+    {
+        var newPurchaseItem = new Dictionary<string, object>
+        {
+            { "materialId", materialId },
+            { "quantity", quantity },
+            { "supplier", supplier },
+            { "poNumber", poNumber },
+            { "timestamp", FieldValue.ServerTimestamp }
+        };
+
+        try
+        {
+            DocumentReference newDocRef = await FirebasePathUtils.GetPurchasesCollection(_canvasAppId, _db).AddAsync(newPurchaseItem);
+            Debug.Log($"Đã thêm bản ghi mua {quantity} vật tư {materialId} vào Firestore. ID: {newDocRef.Id}");
+            return newDocRef.Id;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Lỗi khi thêm bản ghi mua vật tư: {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task UpdateMaterialStock(string taskId, string materialId, int quantityChange)
     {
         if (!int.TryParse(materialId, out int materialNo))
@@ -164,28 +184,6 @@ public class MaterialDataHandler
                 {"timestamp", FieldValue.ServerTimestamp}
             };
             await materialDocRef.Collection("usageHistory").AddAsync(usageHistory);
-        }
-    }
-    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier)
-    {
-        var newPurchaseItem = new Dictionary<string, object>
-        {
-            { "materialId", materialId },
-            { "quantity", quantity },
-            { "supplier", supplier },
-            { "timestamp", FieldValue.ServerTimestamp }
-        };
-
-        try
-        {
-            DocumentReference newDocRef = await FirebasePathUtils.GetPurchasesCollection(_canvasAppId, _db).AddAsync(newPurchaseItem);
-            Debug.Log($"Đã thêm bản ghi mua {quantity} vật tư {materialId} vào Firestore. ID: {newDocRef.Id}");
-            return newDocRef.Id;
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Lỗi khi thêm bản ghi mua vật tư: {ex.Message}");
-            return null;
         }
     }
 }

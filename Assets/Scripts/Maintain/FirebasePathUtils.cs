@@ -27,17 +27,17 @@ public static class FirebasePathUtils
                  .Collection(COLLECTION_MATERIALS);
     }
 
+    public static CollectionReference GetPurchasesCollection(string canvasAppId, FirebaseFirestore db)
+    {
+        return db.Collection(COLLECTION_ARTIFACTS)
+                 .Document(canvasAppId)
+                 .Collection(COLLECTION_PUBLIC)
+                 .Document(DOCUMENT_DATA)
+                 .Collection(COLLECTION_PURCHASES);
+    }
+
     public static CollectionReference GetTaskMaterialsCollection(string canvasAppId, FirebaseFirestore db, string taskId)
     {
         return GetTasksCollection(canvasAppId, db).Document(taskId).Collection(COLLECTION_MATERIALS);
     }
-
-    public static CollectionReference GetPurchasesCollection(string canvasAppId, FirebaseFirestore db)
-        {
-            return db.Collection(COLLECTION_ARTIFACTS)
-                     .Document(canvasAppId)
-                     .Collection(COLLECTION_PUBLIC)
-                     .Document(DOCUMENT_DATA)
-                     .Collection(COLLECTION_PURCHASES);
-        }
 }

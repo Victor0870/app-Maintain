@@ -1,5 +1,3 @@
-// File: Scripts/ExcelData/FirebaseToBGDatabasePurchaseSynchronizer.cs
-
 using UnityEngine;
 using Firebase.Firestore;
 using BansheeGz.BGDatabase;
@@ -20,23 +18,23 @@ namespace MySpace
                 Debug.LogError("Firebase không sẵn sàng. Không thể đồng bộ hóa lịch sử mua hàng.");
                 return false;
             }
-            
+
             try
             {
                 CollectionReference purchasesCollection = FirebasePathUtils.GetPurchasesCollection(FirebaseManager.Instance.GetCanvasAppId(), FirebaseManager.Instance.db);
 
-                // Lấy các bản ghi mới hơn dấu thời gian đồng bộ cuối cùng
                 Query newPurchasesQuery = purchasesCollection.WhereGreaterThan("timestamp", Timestamp.FromDateTime(lastSyncTimestamp.ToUniversalTime()));
                 QuerySnapshot newPurchasesSnapshot = await newPurchasesQuery.GetSnapshotAsync();
-                
+
                 foreach (DocumentSnapshot purchaseDoc in newPurchasesSnapshot.Documents)
                 {
                     var purchaseData = purchaseDoc.ToDictionary();
                     string firestoreDocId = purchaseDoc.Id;
-                    
+
                     string materialId = purchaseData.TryGetValue("materialId", out object idVal) ? idVal.ToString() : null;
                     int quantity = purchaseData.TryGetValue("quantity", out object quantityVal) ? (int)(long)quantityVal : 0;
                     string supplier = purchaseData.TryGetValue("supplier", out object supplierVal) ? supplierVal.ToString() : "";
+                    string poNumber = purchaseData.TryGetValue("poNumber", out object poVal) ? poVal.ToString() : "";
                     DateTime timestamp = purchaseData.TryGetValue("timestamp", out object tsVal) ? ((Timestamp)tsVal).ToDateTime() : DateTime.MinValue;
 
                     if (materialId != null)
@@ -44,21 +42,21 @@ namespace MySpace
                         var localPurchase = E_PurchaseHistory.FindEntity(e => e.f_firestoreDocId == firestoreDocId);
                         if (localPurchase != null)
                         {
-                            // Cập nhật nếu đã tồn tại
                             localPurchase.f_materialId = materialId;
                             localPurchase.f_quantity = quantity;
                             localPurchase.f_supplier = supplier;
+                            localPurchase.f_name = poNumber;
                             localPurchase.f_timestamp = timestamp;
                             Debug.Log($"Đã cập nhật bản ghi mua hàng cục bộ cho vật tư {materialId}.");
                         }
                         else
                         {
-                            // Thêm bản ghi mới
                             var newPurchaseEntity = E_PurchaseHistory.NewEntity();
                             newPurchaseEntity.f_firestoreDocId = firestoreDocId;
                             newPurchaseEntity.f_materialId = materialId;
                             newPurchaseEntity.f_quantity = quantity;
                             newPurchaseEntity.f_supplier = supplier;
+                            newPurchaseEntity.f_name = poNumber;
                             newPurchaseEntity.f_timestamp = timestamp;
                             Debug.Log($"Đã thêm mới bản ghi mua hàng cho vật tư {materialId}.");
                         }

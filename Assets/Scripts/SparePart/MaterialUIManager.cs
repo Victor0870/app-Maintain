@@ -39,6 +39,8 @@ public class MaterialUIManager
     private Button _confirmNoButton;
     private TextMeshProUGUI _confirmPopupText;
 
+    private GameObject _purchasePanel; // THÊM BIẾN NÀY ĐỂ LƯU THAM CHIẾU
+
     private Dictionary<string, MaterialUsageItemUI> _currentUsageItems = new Dictionary<string, MaterialUsageItemUI>();
 
     public enum ChangeType { NoChange, Added, Increased, Decreased, Removed }
@@ -49,6 +51,7 @@ public class MaterialUIManager
     public event Action OnAddNewUsageClicked;
     public event Action OnConfirmUsageClicked;
     public event Action<string, int> OnAddMaterialToTaskClicked;
+    public event Action<string, int> OnAddMaterialToPurchaseClicked;
     public event Action<string, int, int> OnQuantityChanged;
     public event Action<string, string> OnRemoveItemRequest;
     public event Action<string> OnRemoveMaterialConfirmed;
@@ -78,7 +81,8 @@ public class MaterialUIManager
         GameObject confirmPanel,
         TextMeshProUGUI confirmPopupText,
         Button confirmYesButton,
-        Button confirmNoButton
+        Button confirmNoButton,
+        GameObject purchasePanel // THÊM THAM SỐ NÀY
     )
     {
         _sparePartListPanel = sparePartListPanel;
@@ -108,6 +112,7 @@ public class MaterialUIManager
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
+        _purchasePanel = purchasePanel; // GÁN THAM CHIẾU CHO purchasePanel
 
         SetupUIListeners();
     }
@@ -313,7 +318,14 @@ public class MaterialUIManager
             itemScript.SetMaterialData(name, stock, location, purpose, category, type);
             if (isSelectPanel && itemScript.addButton != null)
             {
-                itemScript.addButton.onClick.AddListener(() => OnAddMaterialToTaskClicked?.Invoke(materialId, 1));
+                if (_purchasePanel != null && _purchasePanel.activeSelf)
+                {
+                    itemScript.addButton.onClick.AddListener(() => OnAddMaterialToPurchaseClicked?.Invoke(materialId, 1));
+                }
+                else
+                {
+                    itemScript.addButton.onClick.AddListener(() => OnAddMaterialToTaskClicked?.Invoke(materialId, 1));
+                }
                 itemScript.addButton.interactable = materialData.f_Stock > 0;
             }
         }

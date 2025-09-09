@@ -166,4 +166,26 @@ public class MaterialDataHandler
             await materialDocRef.Collection("usageHistory").AddAsync(usageHistory);
         }
     }
+    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier)
+    {
+        var newPurchaseItem = new Dictionary<string, object>
+        {
+            { "materialId", materialId },
+            { "quantity", quantity },
+            { "supplier", supplier },
+            { "timestamp", FieldValue.ServerTimestamp }
+        };
+
+        try
+        {
+            DocumentReference newDocRef = await FirebasePathUtils.GetPurchasesCollection(_canvasAppId, _db).AddAsync(newPurchaseItem);
+            Debug.Log($"Đã thêm bản ghi mua {quantity} vật tư {materialId} vào Firestore. ID: {newDocRef.Id}");
+            return newDocRef.Id;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Lỗi khi thêm bản ghi mua vật tư: {ex.Message}");
+            return null;
+        }
+    }
 }

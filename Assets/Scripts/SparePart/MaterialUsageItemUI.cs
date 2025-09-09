@@ -20,9 +20,7 @@ public class MaterialUsageItemUI : MonoBehaviour
 
     public event Action<string, int> OnIncreaseQuantity;
     public event Action<string, int> OnDecreaseQuantity;
-
-    // Thêm sự kiện mới để xử lý việc xóa vật tư
-    public event Action<string> OnRemoveItemRequest;
+    public event Action<string, string> OnRemoveItemRequest;
 
     public void SetMaterialUsageData(string name, string id, int quantity, int stock)
     {
@@ -53,12 +51,11 @@ public class MaterialUsageItemUI : MonoBehaviour
         int currentQuantity = int.Parse(quantityInput.text);
         if (currentQuantity == 1)
         {
-            // Nếu số lượng là 1, gửi yêu cầu xóa
-            OnRemoveItemRequest?.Invoke(_materialId);
+            string message = $"Bạn có chắc chắn muốn xóa vật tư {materialNameText.text} khỏi danh sách sử dụng không?";
+            OnRemoveItemRequest?.Invoke(_materialId, message);
         }
         else
         {
-            // Nếu số lượng lớn hơn 1, tiếp tục giảm
             int newQuantity = currentQuantity - 1;
             quantityInput.text = newQuantity.ToString();
             changeType = MaterialUIManager.ChangeType.Decreased;
@@ -69,6 +66,6 @@ public class MaterialUsageItemUI : MonoBehaviour
     public void UpdateButtons(int currentQuantity, int stock)
     {
         increaseButton.interactable = currentQuantity < stock;
-        decreaseButton.interactable = currentQuantity >= 1; // Luôn cho phép giảm khi số lượng >= 1
+        decreaseButton.interactable = currentQuantity >= 1;
     }
 }

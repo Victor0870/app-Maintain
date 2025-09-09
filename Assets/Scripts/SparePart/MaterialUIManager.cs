@@ -5,13 +5,14 @@ using System.Collections.Generic;
 using MySpace;
 using System;
 using System.Linq;
+using BansheeGz.BGDatabase;
 
 public class MaterialUIManager
 {
     private GameObject _sparePartListPanel;
     private GameObject _materialSelectPanel;
     private Transform _materialsListParent;
-    private Transform _materialSelectParent; // Thêm parent mới
+    private Transform _materialSelectParent;
     private GameObject _materialItemPrefab;
     private GameObject _materialSelectPanelItemPrefab;
     private Button _closeListButton;
@@ -33,14 +34,14 @@ public class MaterialUIManager
     private Button _addNewUsageButton;
     private Button _confirmUsageButton;
 
-    // Thêm các biến cho panel xác nhận xóa
     private GameObject _confirmPanel;
     private Button _confirmYesButton;
     private Button _confirmNoButton;
+    private TextMeshProUGUI _confirmPopupText;
 
     private Dictionary<string, MaterialUsageItemUI> _currentUsageItems = new Dictionary<string, MaterialUsageItemUI>();
 
-    public enum ChangeType { NoChange, Added, Increased, Decreased, Removed } // Thêm trạng thái Removed
+    public enum ChangeType { NoChange, Added, Increased, Decreased, Removed }
 
     public event Action<string, string, string, string> OnSearchOrFilterChanged;
     public event Action OnCloseListPanelClicked;
@@ -49,7 +50,7 @@ public class MaterialUIManager
     public event Action OnConfirmUsageClicked;
     public event Action<string, int> OnAddMaterialToTaskClicked;
     public event Action<string, int, int> OnQuantityChanged;
-    // Sự kiện mới để gửi yêu cầu xóa từ UI lên Manager
+    public event Action<string, string> OnRemoveItemRequest;
     public event Action<string> OnRemoveMaterialConfirmed;
 
     public MaterialUIManager(
@@ -74,7 +75,8 @@ public class MaterialUIManager
         TMP_Dropdown selectTypeFilterDropdown,
         TMP_Dropdown selectLocationFilterDropdown,
         TMP_Dropdown selectCategoryFilterDropdown,
-        GameObject confirmPanel, // Thêm panel xác nhận
+        GameObject confirmPanel,
+        TextMeshProUGUI confirmPopupText,
         Button confirmYesButton,
         Button confirmNoButton
     )
@@ -82,7 +84,7 @@ public class MaterialUIManager
         _sparePartListPanel = sparePartListPanel;
         _materialSelectPanel = materialSelectPanel;
         _materialsListParent = materialsListParent;
-        _materialSelectParent = materialSelectParent; // Gán parent mới
+        _materialSelectParent = materialSelectParent;
         _materialItemPrefab = materialItemPrefab;
         _materialSelectPanelItemPrefab = materialSelectPanelItemPrefab;
         _closeListButton = closeListButton;
@@ -103,6 +105,7 @@ public class MaterialUIManager
         _selectCategoryFilterDropdown = selectCategoryFilterDropdown;
 
         _confirmPanel = confirmPanel;
+        _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
 
@@ -128,13 +131,15 @@ public class MaterialUIManager
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(HideConfirmPanel);
     }
 
-    // Thêm phương thức để hiển thị panel xác nhận
-    public void ShowConfirmPanel(string materialId)
+    public void ShowConfirmPanel(string message, string materialId)
     {
         if (_confirmPanel != null)
         {
             _confirmPanel.SetActive(true);
-            // Gán listener cho nút "Yes" để xác nhận xóa
+            if (_confirmPopupText != null)
+            {
+                _confirmPopupText.text = message;
+            }
             if (_confirmYesButton != null)
             {
                 _confirmYesButton.onClick.RemoveAllListeners();
@@ -250,7 +255,7 @@ public class MaterialUIManager
 
     public void UpdateMaterialsListUI(List<E_SparePart> materials, bool isSelectPanel)
     {
-        ClearMaterialsList(isSelectPanel); // Gọi hàm clear với tham số
+        ClearMaterialsList(isSelectPanel);
         foreach (var materialData in materials)
         {
             DisplayMaterial(materialData, isSelectPanel);
@@ -274,7 +279,6 @@ public class MaterialUIManager
         return _currentUsageItems.Values.ToList();
     }
 
-    // Thêm phương thức để xóa một vật tư khỏi danh sách tạm
     public void RemoveTemporaryMaterial(string materialId)
     {
         if (_currentUsageItems.ContainsKey(materialId))
@@ -287,7 +291,7 @@ public class MaterialUIManager
     private void DisplayMaterial(E_SparePart materialData, bool isSelectPanel)
     {
         GameObject prefabToUse = isSelectPanel ? _materialSelectPanelItemPrefab : _materialItemPrefab;
-        Transform parentToUse = isSelectPanel ? _materialSelectParent : _materialsListParent; // Chọn parent đúng
+        Transform parentToUse = isSelectPanel ? _materialSelectParent : _materialsListParent;
         if (prefabToUse == null || parentToUse == null)
         {
             Debug.LogError("Prefab hoặc Parent Transform chưa được gán!");
@@ -323,7 +327,7 @@ public class MaterialUIManager
             return;
         }
 
-        E_SparePart material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
+        var material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
         if (material == null) return;
 
         GameObject usageUI = GameObject.Instantiate(_usageItemPrefab, _usageListParent);
@@ -335,8 +339,7 @@ public class MaterialUIManager
 
             itemScript.OnIncreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
             itemScript.OnDecreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
-            // Thêm listener cho sự kiện mới
-            itemScript.OnRemoveItemRequest += ShowConfirmPanel;
+            itemScript.OnRemoveItemRequest += (id, message) => ShowConfirmPanel(message, id);
         }
     }
 

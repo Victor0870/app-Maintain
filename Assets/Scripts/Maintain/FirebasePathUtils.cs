@@ -7,6 +7,7 @@ public static class FirebasePathUtils
     private const string DOCUMENT_DATA = "data";
     private const string COLLECTION_TASKS = "tasks";
     private const string COLLECTION_MATERIALS = "materials";
+    private const string COLLECTION_PURCHASES = "purchases";
 
     public static CollectionReference GetTasksCollection(string canvasAppId, FirebaseFirestore db)
     {
@@ -30,4 +31,13 @@ public static class FirebasePathUtils
     {
         return GetTasksCollection(canvasAppId, db).Document(taskId).Collection(COLLECTION_MATERIALS);
     }
+
+    public static CollectionReference GetPurchasesCollection(string canvasAppId, FirebaseFirestore db)
+        {
+            return db.Collection(COLLECTION_ARTIFACTS)
+                     .Document(canvasAppId)
+                     .Collection(COLLECTION_PUBLIC)
+                     .Document(DOCUMENT_DATA)
+                     .Collection(COLLECTION_PURCHASES);
+        }
 }

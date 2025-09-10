@@ -357,7 +357,7 @@ public class MaterialManager : MonoBehaviour
         {
             string poNumber = item.poNumberInput.text;
             string supplier = item.supplierInput.text;
-            if (!float.TryParse(item.priceInput.text, out float price))
+            if (!int.TryParse(item.priceInput.text, out int price))
             {
                 Debug.LogError($"Giá trị giá không hợp lệ cho vật tư {item.materialNameText.text}. Bỏ qua.");
                 continue;

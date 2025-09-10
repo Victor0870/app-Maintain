@@ -17,8 +17,8 @@ public class MaterialManager : MonoBehaviour
     public GameObject materialSelectPanel;
     public GameObject confirmPanel;
     public GameObject purchasePanel;
-    // --- Thêm panel chi tiết vật tư mới ---
     public GameObject materialDetailsPanel;
+    public GameObject addMaterialPanel;
 
     [Header("UI Buttons")]
     public Button showListButton;
@@ -29,8 +29,8 @@ public class MaterialManager : MonoBehaviour
     public Button closePurchaseButton;
     public Button confirmPurchaseButton;
     public Button addNewPurchaseButton;
-    // --- Thêm nút đóng panel chi tiết mới ---
     public Button closeDetailsButton;
+    public Button showAddMaterialPanelButton;
 
     [Header("UI Elements - List Panel")]
     public Transform materialsListParent;
@@ -63,22 +63,18 @@ public class MaterialManager : MonoBehaviour
     [Header("UI Elements - Purchase Panel")]
     public Transform purchaseItemsParent;
     public GameObject purchaseItemPrefab;
-    // --- Đã xóa các khai báo thừa: poNumberInput, purchaseQuantityInput, supplierInput, selectedPurchaseMaterialText ---
-    public TMP_InputField poNumberInput;
-    public TMP_InputField purchaseQuantityInput;
-    public TMP_InputField supplierInput;
-    public TMP_Text selectedPurchaseMaterialText;
+    // --- Đã loại bỏ các khai báo thừa theo phản hồi của bạn ---
 
     [Header("UI Elements - Confirmation Popup")]
     public TextMeshProUGUI confirmPopupText;
     
-    // --- Các biến mới cho panel chi tiết vật tư ---
     [Header("UI Elements - Details Panel")]
     public Transform usageHistoryParent;
     public Transform purchaseHistoryParent;
     public GameObject usageHistoryItemPrefab;
     public GameObject purchaseHistoryItemPrefab;
     
+    public AddMaterialPanelUI addMaterialPanelUI;
 
     public BGDatabaseToFirebaseSynchronizer synchronizerToFirebase;
     public FirebaseToBGDatabaseMaterialUsageSynchronizer materialUsageSynchronizer;
@@ -133,6 +129,13 @@ public class MaterialManager : MonoBehaviour
             return;
         }
 
+        addMaterialPanelUI = addMaterialPanel.GetComponent<AddMaterialPanelUI>();
+        if (addMaterialPanelUI == null)
+        {
+            Debug.LogError("Thiếu script AddMaterialPanelUI trên addMaterialPanel.");
+            return;
+        }
+
         _materialDataHandler = new MaterialDataHandler(FirebaseManager.Instance.db, FirebaseManager.Instance.GetCanvasAppId());
 
         _materialUIManager = new MaterialUIManager(
@@ -141,8 +144,8 @@ public class MaterialManager : MonoBehaviour
             materialUsagePanel, usageListParent, usageItemPrefab, closeUsagePanelButton, addNewUsageButton, confirmUsageButton,
             selectSearchInputField, selectTypeFilterDropdown, selectLocationFilterDropdown, selectCategoryFilterDropdown,
             confirmPanel, confirmPopupText, confirmYesButton, confirmNoButton, purchasePanel,
-            // --- Thêm các tham số mới ---
-            materialDetailsPanel, usageHistoryParent, purchaseHistoryParent, usageHistoryItemPrefab, purchaseHistoryItemPrefab, closeDetailsButton
+            materialDetailsPanel, usageHistoryParent, purchaseHistoryParent, usageHistoryItemPrefab, purchaseHistoryItemPrefab, closeDetailsButton,
+            addMaterialPanel, addMaterialPanelUI.closeButton, addMaterialPanelUI.saveButton
         );
 
         if (showListButton != null) showListButton.onClick.AddListener(HandleShowListClicked);
@@ -150,6 +153,7 @@ public class MaterialManager : MonoBehaviour
         if (closePurchaseButton != null) closePurchaseButton.onClick.AddListener(HandleClosePurchaseClicked);
         if (confirmPurchaseButton != null) confirmPurchaseButton.onClick.AddListener(HandleConfirmPurchaseClicked);
         if (addNewPurchaseButton != null) addNewPurchaseButton.onClick.AddListener(HandleAddNewPurchaseClicked);
+        if (showAddMaterialPanelButton != null) showAddMaterialPanelButton.onClick.AddListener(HandleShowAddMaterialPanelClicked);
 
         if (_materialUIManager != null)
         {
@@ -162,8 +166,8 @@ public class MaterialManager : MonoBehaviour
             _materialUIManager.OnQuantityChanged += HandleQuantityChanged;
             _materialUIManager.OnRemoveMaterialConfirmed += HandleRemoveMaterialConfirmed;
             _materialUIManager.OnAddMaterialToPurchaseClicked += HandleAddMaterialToPurchaseClicked;
-            // --- Đăng ký sự kiện mới ---
             _materialUIManager.OnMaterialItemSelected += HandleMaterialItemSelected;
+            _materialUIManager.OnAddMaterialConfirmed += HandleAddMaterialConfirmed;
         }
 
         if (_materialDataHandler != null)
@@ -176,8 +180,8 @@ public class MaterialManager : MonoBehaviour
         if (materialSelectPanel != null) materialSelectPanel.SetActive(false);
         if (confirmPanel != null) confirmPanel.SetActive(false);
         if (purchasePanel != null) purchasePanel.SetActive(false);
-        // --- Ẩn panel chi tiết khi khởi động ---
         if (materialDetailsPanel != null) materialDetailsPanel.SetActive(false);
+        if (addMaterialPanel != null) addMaterialPanel.SetActive(false);
 
         DateTime latestLocalTimestamp = DateTime.MinValue;
         if (E_SparePart.CountEntities > 0)
@@ -261,6 +265,8 @@ public class MaterialManager : MonoBehaviour
         if (closePurchaseButton != null) closePurchaseButton.onClick.RemoveListener(HandleClosePurchaseClicked);
         if (confirmPurchaseButton != null) confirmPurchaseButton.onClick.RemoveListener(HandleConfirmPurchaseClicked);
         if (addNewPurchaseButton != null) addNewPurchaseButton.onClick.RemoveListener(HandleAddNewPurchaseClicked);
+        if (showAddMaterialPanelButton != null) showAddMaterialPanelButton.onClick.RemoveListener(HandleShowAddMaterialPanelClicked);
+
 
         if (_materialUIManager != null)
         {
@@ -273,8 +279,8 @@ public class MaterialManager : MonoBehaviour
             _materialUIManager.OnQuantityChanged -= HandleQuantityChanged;
             _materialUIManager.OnRemoveMaterialConfirmed -= HandleRemoveMaterialConfirmed;
             _materialUIManager.OnAddMaterialToPurchaseClicked -= HandleAddMaterialToPurchaseClicked;
-            // --- Bỏ đăng ký sự kiện mới ---
             _materialUIManager.OnMaterialItemSelected -= HandleMaterialItemSelected;
+            _materialUIManager.OnAddMaterialConfirmed -= HandleAddMaterialConfirmed;
         }
 
         if (_materialDataHandler != null)
@@ -326,7 +332,6 @@ public class MaterialManager : MonoBehaviour
         if (sparePartListPanel != null) sparePartListPanel.SetActive(true);
         if (materialUsagePanel != null) materialUsagePanel.SetActive(false);
         if (materialSelectPanel != null) materialSelectPanel.SetActive(false);
-        // --- Ẩn panel chi tiết khi hiển thị panel mua hàng ---
         if (materialDetailsPanel != null) materialDetailsPanel.SetActive(false);
 
         _materialUIManager.UpdateMaterialsListUI(_allMaterials, false);
@@ -345,30 +350,6 @@ public class MaterialManager : MonoBehaviour
         _materialUIManager.UpdateMaterialsListUI(_allMaterials, true);
     }
 
-    private async void HandleAddMaterialToPurchaseClicked(string materialId, int initialQuantity)
-    {
-        if (_currentPurchaseItems.Any(item => item.materialId == materialId))
-        {
-            Debug.LogWarning("Vật tư đã có trong danh sách mua hàng.");
-            _materialUIManager.HideMaterialSelectPanel();
-            return;
-        }
-
-        E_SparePart material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
-        if (material == null) return;
-
-        GameObject purchaseUI = GameObject.Instantiate(purchaseItemPrefab, purchaseItemsParent);
-        PurchaseItemUI itemScript = purchaseUI.GetComponent<PurchaseItemUI>();
-
-        if (itemScript != null)
-        {
-            itemScript.SetPurchaseData(material.f_name, materialId);
-            _currentPurchaseItems.Add(itemScript);
-        }
-
-        _materialUIManager.HideMaterialSelectPanel();
-    }
-
 
     private async void HandleConfirmPurchaseClicked()
     {
@@ -376,6 +357,11 @@ public class MaterialManager : MonoBehaviour
         {
             string poNumber = item.poNumberInput.text;
             string supplier = item.supplierInput.text;
+            if (!float.TryParse(item.priceInput.text, out float price))
+            {
+                Debug.LogError($"Giá trị giá không hợp lệ cho vật tư {item.materialNameText.text}. Bỏ qua.");
+                continue;
+            }
 
             if (!int.TryParse(item.quantityInput.text, out int quantity) || quantity <= 0)
             {
@@ -383,7 +369,7 @@ public class MaterialManager : MonoBehaviour
                 continue;
             }
 
-            string firestoreDocId = await _materialDataHandler.AddPurchaseRecordToFirebase(item.materialId, quantity, supplier, poNumber);
+            string firestoreDocId = await _materialDataHandler.AddPurchaseRecordToFirebase(item.materialId, quantity, supplier, poNumber, price);
 
             var localMaterial = E_SparePart.FindEntity(entity => entity.f_No.ToString() == item.materialId);
             if (localMaterial != null)
@@ -403,6 +389,7 @@ public class MaterialManager : MonoBehaviour
                 newPurchaseEntity.f_supplier = supplier;
                 newPurchaseEntity.f_name = poNumber;
                 newPurchaseEntity.f_timestamp = DateTime.Now;
+                newPurchaseEntity.f_price = price;
                 SaveData.Save();
             }
         }
@@ -419,6 +406,11 @@ public class MaterialManager : MonoBehaviour
         }
         _currentPurchaseItems.Clear();
     }
+    
+    private void HandleShowAddMaterialPanelClicked()
+    {
+        _materialUIManager.ShowAddMaterialPanel();
+    }
 
     private void HandleShowListClicked()
     {
@@ -431,7 +423,6 @@ public class MaterialManager : MonoBehaviour
         _materialUIManager.HideMaterialsListPanel();
     }
     
-    // --- Phương thức mới để xử lý sự kiện click vào item vật tư ---
     private void HandleMaterialItemSelected(string materialId)
     {
         E_SparePart material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
@@ -473,6 +464,37 @@ public class MaterialManager : MonoBehaviour
         }
 
         _materialUIManager.UpdateMaterialsListUI(searchResults, _materialUIManager.IsMaterialSelectPanelActive());
+    }
+    
+    private async void HandleAddMaterialConfirmed(E_SparePart newMaterial)
+    {
+        if (_allMaterials.Any(m => m.f_No == newMaterial.f_No))
+        {
+            Debug.LogError($"ID vật tư {newMaterial.f_No} đã tồn tại. Vui lòng nhập ID khác.");
+            return;
+        }
+
+        E_SparePart newLocalEntity = E_SparePart.NewEntity();
+        newLocalEntity.f_No = newMaterial.f_No;
+        newLocalEntity.f_name = newMaterial.f_name;
+        newLocalEntity.f_Purpose = newMaterial.f_Purpose;
+        newLocalEntity.f_Type = newMaterial.f_Type;
+        newLocalEntity.f_Unit = newMaterial.f_Unit;
+        newLocalEntity.f_Stock = newMaterial.f_Stock;
+        newLocalEntity.f_Location = newMaterial.f_Location;
+        newLocalEntity.f_Category = newMaterial.f_Category;
+        newLocalEntity.f_lastUpdate = newMaterial.f_lastUpdate;
+
+        SaveData.Save();
+
+        await _materialDataHandler.AddNewMaterialToFirebase(newLocalEntity);
+
+        LoadAllMaterialsFromBGDatabase();
+        PopulateFilterDropdowns();
+        _materialUIManager.HideAddMaterialPanel();
+        _materialUIManager.ShowMaterialsListPanel();
+        _materialUIManager.UpdateMaterialsListUI(_allMaterials, false);
+        Debug.Log($"Đã thêm mới vật tư '{newLocalEntity.f_name}' vào danh sách.");
     }
 
     private void HandleCloseUsagePanelClicked()

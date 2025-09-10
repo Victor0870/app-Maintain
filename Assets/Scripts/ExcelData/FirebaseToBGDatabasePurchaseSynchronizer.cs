@@ -36,7 +36,7 @@ namespace MySpace
                     string supplier = purchaseData.TryGetValue("supplier", out object supplierVal) ? supplierVal.ToString() : "";
                     string poNumber = purchaseData.TryGetValue("poNumber", out object poVal) ? poVal.ToString() : "";
                     DateTime timestamp = purchaseData.TryGetValue("timestamp", out object tsVal) ? ((Timestamp)tsVal).ToDateTime() : DateTime.MinValue;
-                    float price = purchaseData.TryGetValue("price", out object priceVal) ? Convert.ToSingle(priceVal) : 0.0f;
+                    int price = purchaseData.TryGetValue("price", out object priceVal) ? (int)(long)priceVal : 0;
 
                     if (materialId != null)
                     {

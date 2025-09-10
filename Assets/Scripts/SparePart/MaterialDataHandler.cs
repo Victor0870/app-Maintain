@@ -1,9 +1,11 @@
 using Firebase.Firestore;
+using BansheeGz.BGDatabase;
 using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
+using MySpace;
 
 public class MaterialDataHandler
 {
@@ -131,7 +133,7 @@ public class MaterialDataHandler
         }
     }
 
-    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier, string poNumber)
+    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier, string poNumber, float price)
     {
         var newPurchaseItem = new Dictionary<string, object>
         {
@@ -139,13 +141,14 @@ public class MaterialDataHandler
             { "quantity", quantity },
             { "supplier", supplier },
             { "poNumber", poNumber },
-            { "timestamp", FieldValue.ServerTimestamp }
+            { "timestamp", FieldValue.ServerTimestamp },
+            { "price", price }
         };
 
         try
         {
             DocumentReference newDocRef = await FirebasePathUtils.GetPurchasesCollection(_canvasAppId, _db).AddAsync(newPurchaseItem);
-            Debug.Log($"Đã thêm bản ghi mua {quantity} vật tư {materialId} vào Firestore. ID: {newDocRef.Id}");
+            Debug.Log($"Đã thêm bản ghi mua {quantity} vật tư {materialId} với giá {price} vào Firestore. ID: {newDocRef.Id}");
             return newDocRef.Id;
         }
         catch (Exception ex)
@@ -184,6 +187,42 @@ public class MaterialDataHandler
                 {"timestamp", FieldValue.ServerTimestamp}
             };
             await materialDocRef.Collection("usageHistory").AddAsync(usageHistory);
+        }
+    }
+    
+    public async Task AddNewMaterialToFirebase(E_SparePart newMaterial)
+    {
+        if (_db == null)
+        {
+            Debug.LogError("Firebase không được khởi tạo.");
+            return;
+        }
+
+        var materialsCollection = FirebasePathUtils.GetMaterialsCollection(_canvasAppId, _db);
+        
+        var newMaterialData = new Dictionary<string, object>
+        {
+            { "No", newMaterial.f_No.ToString() },
+            { "name", newMaterial.f_name },
+            { "purpose", newMaterial.f_Purpose },
+            { "type", newMaterial.f_Type },
+            { "unit", newMaterial.f_Unit },
+            { "stock", newMaterial.f_Stock },
+            { "location", newMaterial.f_Location },
+            { "category", newMaterial.f_Category },
+            { "lastUpdated", FieldValue.ServerTimestamp }
+        };
+
+        try
+        {
+            DocumentReference newDocRef = await materialsCollection.AddAsync(newMaterialData);
+            newMaterial.f_materialID = newDocRef.Id;
+            SaveData.Save();
+            Debug.Log($"Đã thêm vật tư mới '{newMaterial.f_name}' vào Firestore với ID: {newDocRef.Id}.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Lỗi khi thêm vật tư mới vào Firestore: {ex.Message}");
         }
     }
 }

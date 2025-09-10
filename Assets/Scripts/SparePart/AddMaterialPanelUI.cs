@@ -25,11 +25,10 @@ public class AddMaterialPanelUI : MonoBehaviour
         newMaterial.f_Purpose = purposeInput.text;
         newMaterial.f_Type = typeInput.text;
         newMaterial.f_Unit = unitInput.text;
-        newMaterial.f_Stock = 0; // Luôn đặt stock mặc định bằng 0
+        newMaterial.f_Stock = 0;
         newMaterial.f_Location = locationInput.text;
         newMaterial.f_Category = categoryInput.text;
         newMaterial.f_lastUpdate = DateTime.Now;
-        // f_materialID sẽ được gán sau khi đồng bộ lên Firebase
 
         return newMaterial;
     }

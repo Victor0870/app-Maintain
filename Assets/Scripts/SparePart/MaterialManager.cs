@@ -350,6 +350,31 @@ public class MaterialManager : MonoBehaviour
         _materialUIManager.UpdateMaterialsListUI(_allMaterials, true);
     }
 
+    // --- Phương thức đã bị thiếu trong bản sửa trước đó ---
+    private async void HandleAddMaterialToPurchaseClicked(string materialId, int initialQuantity)
+    {
+        if (_currentPurchaseItems.Any(item => item.materialId == materialId))
+        {
+            Debug.LogWarning("Vật tư đã có trong danh sách mua hàng.");
+            _materialUIManager.HideMaterialSelectPanel();
+            return;
+        }
+
+        E_SparePart material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
+        if (material == null) return;
+
+        GameObject purchaseUI = GameObject.Instantiate(purchaseItemPrefab, purchaseItemsParent);
+        PurchaseItemUI itemScript = purchaseUI.GetComponent<PurchaseItemUI>();
+
+        if (itemScript != null)
+        {
+            itemScript.SetPurchaseData(material.f_name, materialId);
+            _currentPurchaseItems.Add(itemScript);
+        }
+
+        _materialUIManager.HideMaterialSelectPanel();
+    }
+
 
     private async void HandleConfirmPurchaseClicked()
     {

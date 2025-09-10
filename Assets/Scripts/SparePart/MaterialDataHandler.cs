@@ -133,7 +133,7 @@ public class MaterialDataHandler
         }
     }
 
-    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier, string poNumber, float price)
+    public async Task<string> AddPurchaseRecordToFirebase(string materialId, int quantity, string supplier, string poNumber, int price)
     {
         var newPurchaseItem = new Dictionary<string, object>
         {

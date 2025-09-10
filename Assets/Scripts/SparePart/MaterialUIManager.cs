@@ -40,6 +40,13 @@ public class MaterialUIManager
     private TextMeshProUGUI _confirmPopupText;
 
     private GameObject _purchasePanel; // THÊM BIẾN NÀY ĐỂ LƯU THAM CHIẾU
+    
+    // --- Các biến mới cho bảng điều khiển chi tiết vật tư ---
+    private GameObject _materialDetailsPanel;
+    private TextMeshProUGUI _detailsNameText, _detailsStockText, _detailsLocationText, _detailsPurposeText, _detailsCategoryText, _detailsTypeText;
+    private Transform _usageHistoryParent, _purchaseHistoryParent;
+    private GameObject _usageHistoryItemPrefab, _purchaseHistoryItemPrefab;
+    private Button _closeDetailsButton;
 
     private Dictionary<string, MaterialUsageItemUI> _currentUsageItems = new Dictionary<string, MaterialUsageItemUI>();
 
@@ -55,6 +62,9 @@ public class MaterialUIManager
     public event Action<string, int, int> OnQuantityChanged;
     public event Action<string, string> OnRemoveItemRequest;
     public event Action<string> OnRemoveMaterialConfirmed;
+    
+    // --- Sự kiện mới ---
+    public event Action<string> OnMaterialItemSelected;
 
     public MaterialUIManager(
         GameObject sparePartListPanel,
@@ -82,13 +92,19 @@ public class MaterialUIManager
         TextMeshProUGUI confirmPopupText,
         Button confirmYesButton,
         Button confirmNoButton,
-        GameObject purchasePanel // THÊM THAM SỐ NÀY
+        GameObject purchasePanel, // THÊM THAM SỐ NÀY
+        // --- Thêm tham số mới cho panel chi tiết ---
+        GameObject materialDetailsPanel,
+        Transform usageHistoryParent,
+        Transform purchaseHistoryParent,
+        GameObject usageHistoryItemPrefab,
+        GameObject purchaseHistoryItemPrefab,
+        Button closeDetailsButton
     )
     {
         _sparePartListPanel = sparePartListPanel;
         _materialSelectPanel = materialSelectPanel;
         _materialsListParent = materialsListParent;
-        _materialSelectParent = materialSelectParent;
         _materialItemPrefab = materialItemPrefab;
         _materialSelectPanelItemPrefab = materialSelectPanelItemPrefab;
         _closeListButton = closeListButton;
@@ -103,6 +119,7 @@ public class MaterialUIManager
         _addNewUsageButton = addNewUsageButton;
         _confirmUsageButton = confirmUsageButton;
 
+        _materialSelectParent = materialSelectParent;
         _selectSearchInputField = selectSearchInputField;
         _selectTypeFilterDropdown = selectTypeFilterDropdown;
         _selectLocationFilterDropdown = selectLocationFilterDropdown;
@@ -113,6 +130,25 @@ public class MaterialUIManager
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
         _purchasePanel = purchasePanel; // GÁN THAM CHIẾU CHO purchasePanel
+        
+        // --- Gán các tham chiếu mới ---
+        _materialDetailsPanel = materialDetailsPanel;
+        _usageHistoryParent = usageHistoryParent;
+        _purchaseHistoryParent = purchaseHistoryParent;
+        _usageHistoryItemPrefab = usageHistoryItemPrefab;
+        _purchaseHistoryItemPrefab = purchaseHistoryItemPrefab;
+        _closeDetailsButton = closeDetailsButton;
+        
+        // Tìm và gán các TextMeshProUGUI trong panel mới
+        if (_materialDetailsPanel != null)
+        {
+            _detailsNameText = _materialDetailsPanel.transform.Find("NameText").GetComponent<TextMeshProUGUI>();
+            _detailsStockText = _materialDetailsPanel.transform.Find("StockText").GetComponent<TextMeshProUGUI>();
+            _detailsLocationText = _materialDetailsPanel.transform.Find("LocationText").GetComponent<TextMeshProUGUI>();
+            _detailsPurposeText = _materialDetailsPanel.transform.Find("PurposeText").GetComponent<TextMeshProUGUI>();
+            _detailsCategoryText = _materialDetailsPanel.transform.Find("CategoryText").GetComponent<TextMeshProUGUI>();
+            _detailsTypeText = _materialDetailsPanel.transform.Find("TypeText").GetComponent<TextMeshProUGUI>();
+        }
 
         SetupUIListeners();
     }
@@ -134,6 +170,9 @@ public class MaterialUIManager
         if (_selectCategoryFilterDropdown != null) _selectCategoryFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
 
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(HideConfirmPanel);
+        
+        // --- Thêm listener cho nút đóng bảng chi tiết vật tư ---
+        if (_closeDetailsButton != null) _closeDetailsButton.onClick.AddListener(HideMaterialDetailsPanel);
     }
 
     public void ShowConfirmPanel(string message, string materialId)
@@ -212,6 +251,8 @@ public class MaterialUIManager
         {
             _sparePartListPanel.SetActive(true);
             if (_materialSelectPanel != null) _materialSelectPanel.SetActive(false);
+            // --- Ẩn panel chi tiết khi hiển thị panel danh sách ---
+            if (_materialDetailsPanel != null) _materialDetailsPanel.SetActive(false);
         }
     }
 
@@ -255,6 +296,61 @@ public class MaterialUIManager
         if (_materialSelectPanel != null)
         {
             _materialSelectPanel.SetActive(false);
+        }
+    }
+
+    // --- Các phương thức mới để quản lý bảng chi tiết vật tư ---
+    public void ShowMaterialDetailsPanel(string name, string stock, string location, string purpose, string category, string type)
+    {
+        if (_materialDetailsPanel != null)
+        {
+            _materialDetailsPanel.SetActive(true);
+            if (_sparePartListPanel != null) _sparePartListPanel.SetActive(false);
+
+            _detailsNameText.text = name;
+            _detailsStockText.text = stock;
+            _detailsLocationText.text = location;
+            _detailsPurposeText.text = purpose;
+            _detailsCategoryText.text = category;
+            _detailsTypeText.text = type;
+        }
+    }
+
+    public void HideMaterialDetailsPanel()
+    {
+        if (_materialDetailsPanel != null)
+        {
+            _materialDetailsPanel.SetActive(false);
+            if (_sparePartListPanel != null) _sparePartListPanel.SetActive(true);
+        }
+    }
+    
+    // --- Các phương thức mới để cập nhật lịch sử ---
+    public void UpdateUsageHistoryUI(List<E_UsageHistory> usageHistory)
+    {
+        ClearList(_usageHistoryParent);
+        foreach (var record in usageHistory)
+        {
+            GameObject historyItemUI = GameObject.Instantiate(_usageHistoryItemPrefab, _usageHistoryParent);
+            UsageHistoryItemUI itemScript = historyItemUI.GetComponent<UsageHistoryItemUI>();
+            if (itemScript != null)
+            {
+                itemScript.SetData(record.f_quantity, record.f_timestamp);
+            }
+        }
+    }
+
+    public void UpdatePurchaseHistoryUI(List<E_PurchaseHistory> purchaseHistory)
+    {
+        ClearList(_purchaseHistoryParent);
+        foreach (var record in purchaseHistory)
+        {
+            GameObject historyItemUI = GameObject.Instantiate(_purchaseHistoryItemPrefab, _purchaseHistoryParent);
+            PurchaseHistoryItemUI itemScript = historyItemUI.GetComponent<PurchaseHistoryItemUI>();
+            if (itemScript != null)
+            {
+                itemScript.SetData(record.f_name, record.f_quantity, record.f_supplier, record.f_timestamp);
+            }
         }
     }
 
@@ -328,6 +424,11 @@ public class MaterialUIManager
                 }
                 itemScript.addButton.interactable = materialData.f_Stock > 0;
             }
+            // --- Thêm sự kiện click cho nút của item trong danh sách chính ---
+            if (!isSelectPanel && itemScript.itemButton != null)
+            {
+                itemScript.itemButton.onClick.AddListener(() => OnMaterialItemSelected?.Invoke(materialId));
+            }
         }
     }
 
@@ -376,6 +477,16 @@ public class MaterialUIManager
     private void ClearUsageList()
     {
         foreach (Transform child in _usageListParent)
+        {
+            GameObject.Destroy(child.gameObject);
+        }
+    }
+    
+    // --- Phương thức chung để dọn dẹp các danh sách ---
+    private void ClearList(Transform parent)
+    {
+        if (parent == null) return;
+        foreach (Transform child in parent)
         {
             GameObject.Destroy(child.gameObject);
         }

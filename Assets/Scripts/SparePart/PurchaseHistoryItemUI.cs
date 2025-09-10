@@ -8,10 +8,9 @@ public class PurchaseHistoryItemUI : MonoBehaviour
     public TextMeshProUGUI quantityText;
     public TextMeshProUGUI supplierText;
     public TextMeshProUGUI timestampText;
-    // --- Thêm TextMeshProUGUI để hiển thị giá ---
     public TextMeshProUGUI priceText;
 
-    public void SetData(string poNumber, int quantity, string supplier, DateTime timestamp, float price)
+    public void SetData(string poNumber, int quantity, string supplier, DateTime timestamp, int price)
     {
         if (poNumberText != null)
         {
@@ -31,7 +30,7 @@ public class PurchaseHistoryItemUI : MonoBehaviour
         }
         if (priceText != null)
         {
-            priceText.text = $"Giá: {price.ToString("F2")}"; // Định dạng 2 chữ số thập phân
+            priceText.text = $"Giá: {price}";
         }
     }
 }

@@ -222,7 +222,7 @@ public class MaterialUIManager
             searchTerm = _searchInputField.text;
             type = _typeFilterDropdown.options[_typeFilterDropdown.value].text;
             location = _locationFilterDropdown.options[_locationFilterDropdown.value].text;
-            category = _categoryFilterDropdown.options[_categoryDropdown.value].text;
+            category = _categoryFilterDropdown.options[_categoryFilterDropdown.value].text;
         }
         else if (_materialSelectPanel.activeSelf)
         {

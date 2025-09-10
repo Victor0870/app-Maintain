@@ -358,7 +358,7 @@ MonoBehaviour:
         customNames:
         - 
         actionEnabled: 01
-        actionIsOpen: 01
+        actionIsOpen: 00
         actionStartIndex: 00000000
         actionHashCodes: 43e24103
         unityObjectParams: []
@@ -442,8 +442,8 @@ MonoBehaviour:
       colorIndex: 0
       position:
         serializedVersion: 2
-        x: 258
-        y: 91.33594
+        x: 55.75
+        y: 187.44531
         width: 100
         height: 16
       isBreakpoint: 0
@@ -2551,8 +2551,8 @@ MonoBehaviour:
       colorIndex: 0
       position:
         serializedVersion: 2
-        x: 50
-        y: 100
+        x: 52.335938
+        y: 111.328125
         width: 100
         height: 32
       isBreakpoint: 0
@@ -2658,8 +2658,8 @@ MonoBehaviour:
       colorIndex: 0
       position:
         serializedVersion: 2
-        x: 51.992188
-        y: 184.03125
+        x: 54.625
+        y: 190.99219
         width: 100
         height: 16
       isBreakpoint: 0
@@ -2709,7 +2709,7 @@ MonoBehaviour:
           tooltip: 
           showInInspector: 0
           networkSync: 0
-          value: 0
+          value: 3
         fsmBoolParams:
         - useVariable: 0
           name: 

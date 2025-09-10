@@ -36,6 +36,7 @@ namespace MySpace
                     string supplier = purchaseData.TryGetValue("supplier", out object supplierVal) ? supplierVal.ToString() : "";
                     string poNumber = purchaseData.TryGetValue("poNumber", out object poVal) ? poVal.ToString() : "";
                     DateTime timestamp = purchaseData.TryGetValue("timestamp", out object tsVal) ? ((Timestamp)tsVal).ToDateTime() : DateTime.MinValue;
+                    float price = purchaseData.TryGetValue("price", out object priceVal) ? Convert.ToSingle(priceVal) : 0.0f;
 
                     if (materialId != null)
                     {
@@ -47,6 +48,7 @@ namespace MySpace
                             localPurchase.f_supplier = supplier;
                             localPurchase.f_name = poNumber;
                             localPurchase.f_timestamp = timestamp;
+                            localPurchase.f_price = price;
                             Debug.Log($"Đã cập nhật bản ghi mua hàng cục bộ cho vật tư {materialId}.");
                         }
                         else
@@ -58,6 +60,7 @@ namespace MySpace
                             newPurchaseEntity.f_supplier = supplier;
                             newPurchaseEntity.f_name = poNumber;
                             newPurchaseEntity.f_timestamp = timestamp;
+                            newPurchaseEntity.f_price = price;
                             Debug.Log($"Đã thêm mới bản ghi mua hàng cho vật tư {materialId}.");
                         }
                     }

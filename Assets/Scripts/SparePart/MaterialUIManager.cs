@@ -157,7 +157,6 @@ public class MaterialUIManager
             _detailsTypeText = _materialDetailsPanel.transform.Find("TypeText").GetComponent<TextMeshProUGUI>();
         }
 
-        // --- Gán các tham chiếu mới và thêm listeners ---
         _addMaterialPanel = addMaterialPanel;
         if (addMaterialCloseButton != null) addMaterialCloseButton.onClick.AddListener(HideAddMaterialPanel);
         if (addMaterialSaveButton != null) addMaterialSaveButton.onClick.AddListener(() => OnAddMaterialConfirmed?.Invoke(_addMaterialPanel.GetComponent<AddMaterialPanelUI>().GetMaterialData()));
@@ -335,7 +334,6 @@ public class MaterialUIManager
         }
     }
     
-    // --- Các phương thức mới để quản lý panel thêm vật tư ---
     public void ShowAddMaterialPanel()
     {
         if (_addMaterialPanel != null)
@@ -378,7 +376,7 @@ public class MaterialUIManager
             PurchaseHistoryItemUI itemScript = historyItemUI.GetComponent<PurchaseHistoryItemUI>();
             if (itemScript != null)
             {
-                itemScript.SetData(record.f_name, record.f_quantity, record.f_supplier, record.f_timestamp);
+                itemScript.SetData(record.f_name, record.f_quantity, record.f_supplier, record.f_timestamp, record.f_price);
             }
         }
     }

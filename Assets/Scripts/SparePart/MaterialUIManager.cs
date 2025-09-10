@@ -39,14 +39,18 @@ public class MaterialUIManager
     private Button _confirmNoButton;
     private TextMeshProUGUI _confirmPopupText;
 
-    private GameObject _purchasePanel; // THÊM BIẾN NÀY ĐỂ LƯU THAM CHIẾU
+    private GameObject _purchasePanel;
     
-    // --- Các biến mới cho bảng điều khiển chi tiết vật tư ---
+    // --- Biến cho bảng điều khiển chi tiết vật tư ---
     private GameObject _materialDetailsPanel;
     private TextMeshProUGUI _detailsNameText, _detailsStockText, _detailsLocationText, _detailsPurposeText, _detailsCategoryText, _detailsTypeText;
     private Transform _usageHistoryParent, _purchaseHistoryParent;
     private GameObject _usageHistoryItemPrefab, _purchaseHistoryItemPrefab;
     private Button _closeDetailsButton;
+
+    // --- Biến mới cho panel thêm vật tư ---
+    private GameObject _addMaterialPanel;
+    private AddMaterialPanelUI _addMaterialPanelUI;
 
     private Dictionary<string, MaterialUsageItemUI> _currentUsageItems = new Dictionary<string, MaterialUsageItemUI>();
 
@@ -63,8 +67,10 @@ public class MaterialUIManager
     public event Action<string, string> OnRemoveItemRequest;
     public event Action<string> OnRemoveMaterialConfirmed;
     
-    // --- Sự kiện mới ---
     public event Action<string> OnMaterialItemSelected;
+    
+    // --- Sự kiện mới ---
+    public event Action<E_SparePart> OnAddMaterialConfirmed;
 
     public MaterialUIManager(
         GameObject sparePartListPanel,
@@ -92,14 +98,17 @@ public class MaterialUIManager
         TextMeshProUGUI confirmPopupText,
         Button confirmYesButton,
         Button confirmNoButton,
-        GameObject purchasePanel, // THÊM THAM SỐ NÀY
-        // --- Thêm tham số mới cho panel chi tiết ---
+        GameObject purchasePanel,
         GameObject materialDetailsPanel,
         Transform usageHistoryParent,
         Transform purchaseHistoryParent,
         GameObject usageHistoryItemPrefab,
         GameObject purchaseHistoryItemPrefab,
-        Button closeDetailsButton
+        Button closeDetailsButton,
+        // --- Thêm tham số mới cho panel thêm vật tư ---
+        GameObject addMaterialPanel,
+        Button addMaterialCloseButton,
+        Button addMaterialSaveButton
     )
     {
         _sparePartListPanel = sparePartListPanel;
@@ -129,9 +138,8 @@ public class MaterialUIManager
         _confirmPopupText = confirmPopupText;
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
-        _purchasePanel = purchasePanel; // GÁN THAM CHIẾU CHO purchasePanel
+        _purchasePanel = purchasePanel;
         
-        // --- Gán các tham chiếu mới ---
         _materialDetailsPanel = materialDetailsPanel;
         _usageHistoryParent = usageHistoryParent;
         _purchaseHistoryParent = purchaseHistoryParent;
@@ -139,7 +147,6 @@ public class MaterialUIManager
         _purchaseHistoryItemPrefab = purchaseHistoryItemPrefab;
         _closeDetailsButton = closeDetailsButton;
         
-        // Tìm và gán các TextMeshProUGUI trong panel mới
         if (_materialDetailsPanel != null)
         {
             _detailsNameText = _materialDetailsPanel.transform.Find("NameText").GetComponent<TextMeshProUGUI>();
@@ -149,6 +156,11 @@ public class MaterialUIManager
             _detailsCategoryText = _materialDetailsPanel.transform.Find("CategoryText").GetComponent<TextMeshProUGUI>();
             _detailsTypeText = _materialDetailsPanel.transform.Find("TypeText").GetComponent<TextMeshProUGUI>();
         }
+
+        // --- Gán các tham chiếu mới và thêm listeners ---
+        _addMaterialPanel = addMaterialPanel;
+        if (addMaterialCloseButton != null) addMaterialCloseButton.onClick.AddListener(HideAddMaterialPanel);
+        if (addMaterialSaveButton != null) addMaterialSaveButton.onClick.AddListener(() => OnAddMaterialConfirmed?.Invoke(_addMaterialPanel.GetComponent<AddMaterialPanelUI>().GetMaterialData()));
 
         SetupUIListeners();
     }
@@ -171,7 +183,6 @@ public class MaterialUIManager
 
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(HideConfirmPanel);
         
-        // --- Thêm listener cho nút đóng bảng chi tiết vật tư ---
         if (_closeDetailsButton != null) _closeDetailsButton.onClick.AddListener(HideMaterialDetailsPanel);
     }
 
@@ -251,8 +262,8 @@ public class MaterialUIManager
         {
             _sparePartListPanel.SetActive(true);
             if (_materialSelectPanel != null) _materialSelectPanel.SetActive(false);
-            // --- Ẩn panel chi tiết khi hiển thị panel danh sách ---
             if (_materialDetailsPanel != null) _materialDetailsPanel.SetActive(false);
+            if (_addMaterialPanel != null) _addMaterialPanel.SetActive(false);
         }
     }
 
@@ -299,7 +310,6 @@ public class MaterialUIManager
         }
     }
 
-    // --- Các phương thức mới để quản lý bảng chi tiết vật tư ---
     public void ShowMaterialDetailsPanel(string name, string stock, string location, string purpose, string category, string type)
     {
         if (_materialDetailsPanel != null)
@@ -325,7 +335,26 @@ public class MaterialUIManager
         }
     }
     
-    // --- Các phương thức mới để cập nhật lịch sử ---
+    // --- Các phương thức mới để quản lý panel thêm vật tư ---
+    public void ShowAddMaterialPanel()
+    {
+        if (_addMaterialPanel != null)
+        {
+            _addMaterialPanel.SetActive(true);
+            if (_sparePartListPanel != null) _sparePartListPanel.SetActive(false);
+        }
+    }
+    
+    public void HideAddMaterialPanel()
+    {
+        if (_addMaterialPanel != null)
+        {
+            _addMaterialPanel.SetActive(false);
+            _addMaterialPanel.GetComponent<AddMaterialPanelUI>().ClearInputs();
+            if (_sparePartListPanel != null) _sparePartListPanel.SetActive(true);
+        }
+    }
+
     public void UpdateUsageHistoryUI(List<E_UsageHistory> usageHistory)
     {
         ClearList(_usageHistoryParent);
@@ -424,7 +453,6 @@ public class MaterialUIManager
                 }
                 itemScript.addButton.interactable = materialData.f_Stock > 0;
             }
-            // --- Thêm sự kiện click cho nút của item trong danh sách chính ---
             if (!isSelectPanel && itemScript.itemButton != null)
             {
                 itemScript.itemButton.onClick.AddListener(() => OnMaterialItemSelected?.Invoke(materialId));
@@ -482,7 +510,6 @@ public class MaterialUIManager
         }
     }
     
-    // --- Phương thức chung để dọn dẹp các danh sách ---
     private void ClearList(Transform parent)
     {
         if (parent == null) return;

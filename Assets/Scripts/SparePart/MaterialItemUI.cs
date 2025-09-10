@@ -13,6 +13,8 @@ public class MaterialItemUI : MonoBehaviour
 
     // Thêm biến public Button để tham chiếu nút "Thêm vào"
     public Button addButton;
+    // Thêm biến mới để tham chiếu nút bấm của item trong danh sách
+    public Button itemButton;
 
     public void SetMaterialData(string name, string stock, string location, string purpose, string category, string type)
     {

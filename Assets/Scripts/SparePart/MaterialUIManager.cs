@@ -41,14 +41,12 @@ public class MaterialUIManager
 
     private GameObject _purchasePanel;
     
-    // --- Biến cho bảng điều khiển chi tiết vật tư ---
     private GameObject _materialDetailsPanel;
     private TextMeshProUGUI _detailsNameText, _detailsStockText, _detailsLocationText, _detailsPurposeText, _detailsCategoryText, _detailsTypeText;
     private Transform _usageHistoryParent, _purchaseHistoryParent;
     private GameObject _usageHistoryItemPrefab, _purchaseHistoryItemPrefab;
     private Button _closeDetailsButton;
 
-    // --- Biến mới cho panel thêm vật tư ---
     private GameObject _addMaterialPanel;
     private AddMaterialPanelUI _addMaterialPanelUI;
 
@@ -69,7 +67,6 @@ public class MaterialUIManager
     
     public event Action<string> OnMaterialItemSelected;
     
-    // --- Sự kiện mới ---
     public event Action<E_SparePart> OnAddMaterialConfirmed;
 
     public MaterialUIManager(
@@ -225,7 +222,7 @@ public class MaterialUIManager
             searchTerm = _searchInputField.text;
             type = _typeFilterDropdown.options[_typeFilterDropdown.value].text;
             location = _locationFilterDropdown.options[_locationFilterDropdown.value].text;
-            category = _categoryFilterDropdown.options[_categoryFilterDropdown.value].text;
+            category = _categoryFilterDropdown.options[_categoryDropdown.value].text;
         }
         else if (_materialSelectPanel.activeSelf)
         {

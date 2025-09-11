@@ -13,20 +13,20 @@ public class UsageHistoryItemUI : MonoBehaviour
     {
         if (quantityText != null)
         {
-            quantityText.text = $"Số lượng: {quantity}";
+            quantityText.text = $"{quantity}";
         }
         if (timestampText != null)
         {
-            timestampText.text = $"Thời gian: {timestamp.ToString("dd/MM/yyyy HH:mm")}";
+            timestampText.text = $"{timestamp.ToString("dd/MM/yyyy HH:mm")}";
         }
         if (taskNameText != null)
         {
-            taskNameText.text = $"Công việc: {taskName}";
+            taskNameText.text = $"{taskName}";
         }
         // Hiển thị tên người yêu cầu
         if (createdByText != null)
         {
-            createdByText.text = $"Người yêu cầu: {createdBy}";
+            createdByText.text = $"{createdBy}";
         }
     }
 }

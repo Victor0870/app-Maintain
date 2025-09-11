@@ -1,16 +1,21 @@
 using UnityEngine;
 using TMPro;
 using System;
+using UnityEngine.UI;
 
 public class UsageHistoryItemUI : MonoBehaviour
 {
     public TextMeshProUGUI quantityText;
     public TextMeshProUGUI timestampText;
     public TextMeshProUGUI taskNameText;
-    public TextMeshProUGUI createdByText; // Thêm biến mới
+    public TextMeshProUGUI createdByText;
+    public Button itemButton;
 
-    public void SetData(int quantity, DateTime timestamp, string taskName, string createdBy) // Thêm tham số createdBy
+    private string _taskId;
+
+    public void SetData(int quantity, DateTime timestamp, string taskName, string createdBy, string taskId)
     {
+        _taskId = taskId;
         if (quantityText != null)
         {
             quantityText.text = $"{quantity}";
@@ -23,10 +28,14 @@ public class UsageHistoryItemUI : MonoBehaviour
         {
             taskNameText.text = $"{taskName}";
         }
-        // Hiển thị tên người yêu cầu
         if (createdByText != null)
         {
             createdByText.text = $"{createdBy}";
         }
+    }
+
+    public string GetTaskId()
+    {
+        return _taskId;
     }
 }

@@ -230,17 +230,17 @@ public class TaskManager : MonoBehaviour
         Debug.Log("Không cần tải thêm vì dữ liệu đã có sẵn cục bộ.");
     }
 
-    private void HandleTaskItemClick(Dictionary<string, object> taskData)
-    {
-        _currentSelectedTaskId = taskData.ContainsKey("id") ? taskData["id"].ToString() : null;
-        Debug.Log("Đã nhấp vào công việc. ID công việc: " + _currentSelectedTaskId);
-        _taskUIManager.ShowTaskDetails(taskData);
-        string currentStatus = taskData.TryGetValue("status", out object statusVal) ? statusVal.ToString() : TaskConstants.STATUS_PENDING;
-        if (taskStatusController != null)
+     public void HandleTaskItemClick(Dictionary<string, object> taskData)
         {
-            taskStatusController.SetStatus(currentStatus);
+            _currentSelectedTaskId = taskData.ContainsKey("id") ? taskData["id"].ToString() : null;
+            Debug.Log("Đã nhấp vào công việc. ID công việc: " + _currentSelectedTaskId);
+            _taskUIManager.ShowTaskDetails(taskData);
+            string currentStatus = taskData.TryGetValue("status", out object statusVal) ? statusVal.ToString() : TaskConstants.STATUS_PENDING;
+            if (taskStatusController != null)
+            {
+                taskStatusController.SetStatus(currentStatus);
+            }
         }
-    }
 
     private void HandleTaskStatusChanged(string newStatus)
     {

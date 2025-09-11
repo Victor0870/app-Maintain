@@ -7,6 +7,7 @@ using BansheeGz.BGDatabase;
 using System.Threading.Tasks;
 using System.Linq;
 using System;
+using Firebase.Firestore;
 
 public class MaterialManager : MonoBehaviour
 {
@@ -63,22 +64,24 @@ public class MaterialManager : MonoBehaviour
     [Header("UI Elements - Purchase Panel")]
     public Transform purchaseItemsParent;
     public GameObject purchaseItemPrefab;
-    // --- Đã loại bỏ các khai báo thừa theo phản hồi của bạn ---
 
     [Header("UI Elements - Confirmation Popup")]
     public TextMeshProUGUI confirmPopupText;
-    
+
     [Header("UI Elements - Details Panel")]
     public Transform usageHistoryParent;
     public Transform purchaseHistoryParent;
     public GameObject usageHistoryItemPrefab;
     public GameObject purchaseHistoryItemPrefab;
-    
+
     public AddMaterialPanelUI addMaterialPanelUI;
 
     public BGDatabaseToFirebaseSynchronizer synchronizerToFirebase;
     public FirebaseToBGDatabaseMaterialUsageSynchronizer materialUsageSynchronizer;
     public FirebaseToBGDatabasePurchaseSynchronizer purchaseSynchronizer;
+
+    [Header("Controllers")]
+    public TaskManager taskManager;
 
     private List<E_SparePart> _allMaterials = new List<E_SparePart>();
     private string _currentTaskId;
@@ -87,6 +90,7 @@ public class MaterialManager : MonoBehaviour
     private MaterialUIManager _materialUIManager;
     private FirebaseToBGDatabaseSynchronizer _synchronizer;
     private MaterialDataHandler _materialDataHandler;
+    private ListenerRegistration _materialsListener;
 
     private Dictionary<string, object> _temporaryTaskMaterials = new Dictionary<string, object>();
     private List<PurchaseItemUI> _currentPurchaseItems = new List<PurchaseItemUI>();
@@ -168,6 +172,7 @@ public class MaterialManager : MonoBehaviour
             _materialUIManager.OnAddMaterialToPurchaseClicked += HandleAddMaterialToPurchaseClicked;
             _materialUIManager.OnMaterialItemSelected += HandleMaterialItemSelected;
             _materialUIManager.OnAddMaterialConfirmed += HandleAddMaterialConfirmed;
+            _materialUIManager.OnUsageItemClicked += HandleUsageItemClicked;
         }
 
         if (_materialDataHandler != null)
@@ -217,7 +222,86 @@ public class MaterialManager : MonoBehaviour
             PopulateFilterDropdowns();
             SaveData.Save();
             Debug.Log("Đã lưu dữ liệu vào bộ nhớ cục bộ.");
+            SetupRealTimeListener();
         }
+    }
+
+    void OnDestroy()
+    {
+        if (showListButton != null) showListButton.onClick.RemoveListener(HandleShowListClicked);
+        if (showPurchaseButton != null) showPurchaseButton.onClick.RemoveListener(HandleShowPurchaseClicked);
+        if (closePurchaseButton != null) closePurchaseButton.onClick.RemoveListener(HandleClosePurchaseClicked);
+        if (confirmPurchaseButton != null) confirmPurchaseButton.onClick.RemoveListener(HandleConfirmPurchaseClicked);
+        if (addNewPurchaseButton != null) addNewPurchaseButton.onClick.RemoveListener(HandleAddNewPurchaseClicked);
+        if (showAddMaterialPanelButton != null) showAddMaterialPanelButton.onClick.RemoveListener(HandleShowAddMaterialPanelClicked);
+
+
+        if (_materialUIManager != null)
+        {
+            _materialUIManager.OnCloseListPanelClicked -= HandleCloseListPanelClicked;
+            _materialUIManager.OnSearchOrFilterChanged -= HandleSearchOrFilterChanged;
+            _materialUIManager.OnCloseUsagePanelClicked -= HandleCloseUsagePanelClicked;
+            _materialUIManager.OnAddNewUsageClicked -= HandleAddNewUsageClicked;
+            _materialUIManager.OnConfirmUsageClicked -= HandleConfirmUsageClicked;
+            _materialUIManager.OnAddMaterialToTaskClicked -= HandleAddMaterialToTaskClicked;
+            _materialUIManager.OnQuantityChanged -= HandleQuantityChanged;
+            _materialUIManager.OnRemoveMaterialConfirmed -= HandleRemoveMaterialConfirmed;
+            _materialUIManager.OnAddMaterialToPurchaseClicked -= HandleAddMaterialToPurchaseClicked;
+            _materialUIManager.OnMaterialItemSelected -= HandleMaterialItemSelected;
+            _materialUIManager.OnAddMaterialConfirmed -= HandleAddMaterialConfirmed;
+            _materialUIManager.OnUsageItemClicked -= HandleUsageItemClicked;
+        }
+
+        if (_materialDataHandler != null)
+        {
+            _materialDataHandler.OnTaskMaterialsChanged -= _materialUIManager.UpdateMaterialUsageUI;
+        }
+
+        if (_materialsListener != null)
+        {
+            _materialsListener.Stop();
+            _materialsListener = null;
+        }
+
+        _materialDataHandler.StopListeningForTaskMaterials();
+    }
+
+    private void SetupRealTimeListener()
+    {
+        if (_materialsListener != null) return;
+
+        CollectionReference materialsRef = FirebasePathUtils.GetMaterialsCollection(FirebaseManager.Instance.GetCanvasAppId(), FirebaseManager.Instance.db);
+
+        _materialsListener = materialsRef.Listen(snapshot =>
+        {
+            foreach (DocumentChange change in snapshot.GetChanges())
+            {
+                var doc = change.Document;
+                string firestoreDocId = doc.Id;
+
+                var localEntity = E_SparePart.FindEntity(entity => entity.f_materialID == firestoreDocId);
+
+                if (localEntity != null)
+                {
+                    if (doc.TryGetValue("stock", out object stockObj) && stockObj is long stockValue)
+                    {
+                        int newStock = (int)stockValue;
+                        if (localEntity.f_Stock != newStock)
+                        {
+                            localEntity.f_Stock = newStock;
+                            SaveData.Save();
+                            Debug.Log($"Đã cập nhật tồn kho cục bộ cho vật tư '{localEntity.f_name}' thành {newStock}.");
+                            UnityMainThreadDispatcher.Instance().Enqueue(() => {
+                                LoadAllMaterialsFromBGDatabase();
+                                _materialUIManager.UpdateMaterialsListUI(_allMaterials, _materialUIManager.IsMaterialSelectPanelActive());
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        Debug.Log("Đã thiết lập trình lắng nghe thời gian thực cho tồn kho vật tư.");
     }
 
     private void PopulateFilterDropdowns()
@@ -258,38 +342,6 @@ public class MaterialManager : MonoBehaviour
         Debug.Log($"Đã tải {E_SparePart.CountEntities} vật tư từ BGDatabase cục bộ.");
     }
 
-    void OnDestroy()
-    {
-        if (showListButton != null) showListButton.onClick.RemoveListener(HandleShowListClicked);
-        if (showPurchaseButton != null) showPurchaseButton.onClick.RemoveListener(HandleShowPurchaseClicked);
-        if (closePurchaseButton != null) closePurchaseButton.onClick.RemoveListener(HandleClosePurchaseClicked);
-        if (confirmPurchaseButton != null) confirmPurchaseButton.onClick.RemoveListener(HandleConfirmPurchaseClicked);
-        if (addNewPurchaseButton != null) addNewPurchaseButton.onClick.RemoveListener(HandleAddNewPurchaseClicked);
-        if (showAddMaterialPanelButton != null) showAddMaterialPanelButton.onClick.RemoveListener(HandleShowAddMaterialPanelClicked);
-
-
-        if (_materialUIManager != null)
-        {
-            _materialUIManager.OnCloseListPanelClicked -= HandleCloseListPanelClicked;
-            _materialUIManager.OnSearchOrFilterChanged -= HandleSearchOrFilterChanged;
-            _materialUIManager.OnCloseUsagePanelClicked -= HandleCloseUsagePanelClicked;
-            _materialUIManager.OnAddNewUsageClicked -= HandleAddNewUsageClicked;
-            _materialUIManager.OnConfirmUsageClicked -= HandleConfirmUsageClicked;
-            _materialUIManager.OnAddMaterialToTaskClicked -= HandleAddMaterialToTaskClicked;
-            _materialUIManager.OnQuantityChanged -= HandleQuantityChanged;
-            _materialUIManager.OnRemoveMaterialConfirmed -= HandleRemoveMaterialConfirmed;
-            _materialUIManager.OnAddMaterialToPurchaseClicked -= HandleAddMaterialToPurchaseClicked;
-            _materialUIManager.OnMaterialItemSelected -= HandleMaterialItemSelected;
-            _materialUIManager.OnAddMaterialConfirmed -= HandleAddMaterialConfirmed;
-        }
-
-        if (_materialDataHandler != null)
-        {
-            _materialDataHandler.OnTaskMaterialsChanged -= _materialUIManager.UpdateMaterialUsageUI;
-        }
-
-        _materialDataHandler.StopListeningForTaskMaterials();
-    }
     private async void HandleRemoveMaterialConfirmed(string materialId)
     {
         var localUsageRecord = E_UsageHistory.FindEntity(e => e.f_materialId == materialId && e.f_taskId == _currentTaskId);
@@ -350,7 +402,6 @@ public class MaterialManager : MonoBehaviour
         _materialUIManager.UpdateMaterialsListUI(_allMaterials, true);
     }
 
-    // --- Phương thức đã bị thiếu trong bản sửa trước đó ---
     private async void HandleAddMaterialToPurchaseClicked(string materialId, int initialQuantity)
     {
         if (_currentPurchaseItems.Any(item => item.materialId == materialId))
@@ -374,7 +425,6 @@ public class MaterialManager : MonoBehaviour
 
         _materialUIManager.HideMaterialSelectPanel();
     }
-
 
     private async void HandleConfirmPurchaseClicked()
     {
@@ -431,7 +481,7 @@ public class MaterialManager : MonoBehaviour
         }
         _currentPurchaseItems.Clear();
     }
-    
+
     private void HandleShowAddMaterialPanelClicked()
     {
         _materialUIManager.ShowAddMaterialPanel();
@@ -447,18 +497,18 @@ public class MaterialManager : MonoBehaviour
     {
         _materialUIManager.HideMaterialsListPanel();
     }
-    
+
     private void HandleMaterialItemSelected(string materialId)
     {
         E_SparePart material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
         if (material != null)
         {
             _materialUIManager.ShowMaterialDetailsPanel(
-                material.f_name, 
-                material.f_Stock.ToString(), 
-                material.f_Location, 
-                material.f_Purpose, 
-                material.f_Category, 
+                material.f_name,
+                material.f_Stock.ToString(),
+                material.f_Location,
+                material.f_Purpose,
+                material.f_Category,
                 material.f_Type
             );
 
@@ -490,7 +540,7 @@ public class MaterialManager : MonoBehaviour
 
         _materialUIManager.UpdateMaterialsListUI(searchResults, _materialUIManager.IsMaterialSelectPanelActive());
     }
-    
+
     private async void HandleAddMaterialConfirmed(E_SparePart newMaterial)
     {
         if (_allMaterials.Any(m => m.f_No == newMaterial.f_No))
@@ -648,6 +698,27 @@ public class MaterialManager : MonoBehaviour
         if (materialToUpdate != null)
         {
             _materialUIManager.UpdateQuantityButtons(materialId, newQuantity, materialToUpdate.f_Stock);
+        }
+    }
+
+    private void HandleUsageItemClicked(string taskId)
+    {
+        var taskEntity = E_Task.FindEntity(entity => entity.f_Id == taskId);
+        if (taskEntity != null)
+        {
+            var taskData = new System.Collections.Generic.Dictionary<string, object>
+            {
+                { "id", taskEntity.f_Id },
+                { "content", taskEntity.f_name },
+                { "location", taskEntity.f_location },
+                { "description", taskEntity.f_description },
+                { "createdBy", taskEntity.f_createdBy },
+                { "status", taskEntity.f_status },
+                { "risks", taskEntity.f_risks.Select(id => (object)(long)id).ToList() },
+                { "timestamp", Firebase.Firestore.Timestamp.FromDateTime(taskEntity.f_lastUpdated) }
+            };
+            taskManager.HandleTaskItemClick(taskData);
+            _materialUIManager.HideMaterialDetailsPanel();
         }
     }
 }

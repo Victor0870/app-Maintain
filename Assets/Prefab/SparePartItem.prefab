@@ -336,6 +336,8 @@ MonoBehaviour:
   purposeText: {fileID: 1697216377624157957}
   categoryText: {fileID: 1268936426470233362}
   typeText: {fileID: 955422417894544884}
+  addButton: {fileID: 0}
+  itemButton: {fileID: 2391359681864041764}
 --- !u!1 &1857979737025916206
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,11 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System.Collections.Generic;
-using MySpace;
-using System;
-using System.Linq;
 using BansheeGz.BGDatabase;
+using System.Collections.Generic;
+using System;
+using System.Collections;
+using MySpace;
+using System.Linq;
 
 public class MaterialUIManager
 {
@@ -40,7 +41,7 @@ public class MaterialUIManager
     private TextMeshProUGUI _confirmPopupText;
 
     private GameObject _purchasePanel;
-    
+
     private GameObject _materialDetailsPanel;
     private TextMeshProUGUI _detailsNameText, _detailsStockText, _detailsLocationText, _detailsPurposeText, _detailsCategoryText, _detailsTypeText;
     private Transform _usageHistoryParent, _purchaseHistoryParent;
@@ -64,10 +65,9 @@ public class MaterialUIManager
     public event Action<string, int, int> OnQuantityChanged;
     public event Action<string, string> OnRemoveItemRequest;
     public event Action<string> OnRemoveMaterialConfirmed;
-    
     public event Action<string> OnMaterialItemSelected;
-    
     public event Action<E_SparePart> OnAddMaterialConfirmed;
+    public event Action<string> OnUsageItemClicked;
 
     public MaterialUIManager(
         GameObject sparePartListPanel,
@@ -102,7 +102,6 @@ public class MaterialUIManager
         GameObject usageHistoryItemPrefab,
         GameObject purchaseHistoryItemPrefab,
         Button closeDetailsButton,
-        // --- Thêm tham số mới cho panel thêm vật tư ---
         GameObject addMaterialPanel,
         Button addMaterialCloseButton,
         Button addMaterialSaveButton
@@ -136,14 +135,14 @@ public class MaterialUIManager
         _confirmYesButton = confirmYesButton;
         _confirmNoButton = confirmNoButton;
         _purchasePanel = purchasePanel;
-        
+
         _materialDetailsPanel = materialDetailsPanel;
         _usageHistoryParent = usageHistoryParent;
         _purchaseHistoryParent = purchaseHistoryParent;
         _usageHistoryItemPrefab = usageHistoryItemPrefab;
         _purchaseHistoryItemPrefab = purchaseHistoryItemPrefab;
         _closeDetailsButton = closeDetailsButton;
-        
+
         if (_materialDetailsPanel != null)
         {
             _detailsNameText = _materialDetailsPanel.transform.Find("NameText").GetComponent<TextMeshProUGUI>();
@@ -178,7 +177,7 @@ public class MaterialUIManager
         if (_selectCategoryFilterDropdown != null) _selectCategoryFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
 
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(HideConfirmPanel);
-        
+
         if (_closeDetailsButton != null) _closeDetailsButton.onClick.AddListener(HideMaterialDetailsPanel);
     }
 
@@ -330,7 +329,7 @@ public class MaterialUIManager
             if (_sparePartListPanel != null) _sparePartListPanel.SetActive(true);
         }
     }
-    
+
     public void ShowAddMaterialPanel()
     {
         if (_addMaterialPanel != null)
@@ -339,7 +338,7 @@ public class MaterialUIManager
             if (_sparePartListPanel != null) _sparePartListPanel.SetActive(false);
         }
     }
-    
+
     public void HideAddMaterialPanel()
     {
         if (_addMaterialPanel != null)
@@ -350,7 +349,7 @@ public class MaterialUIManager
         }
     }
 
-        public void UpdateUsageHistoryUI(List<E_UsageHistory> usageHistory)
+    public void UpdateUsageHistoryUI(List<E_UsageHistory> usageHistory)
     {
         ClearList(_usageHistoryParent);
         foreach (var record in usageHistory)
@@ -361,17 +360,21 @@ public class MaterialUIManager
             {
                 string taskName = "Không rõ";
                 string createdBy = "Không rõ";
-                
-                // Tìm thông tin công việc từ taskId
+
                 var taskEntity = E_Task.FindEntity(e => e.f_Id == record.f_taskId);
                 if (taskEntity != null)
                 {
                     taskName = taskEntity.f_name;
-                    createdBy = taskEntity.f_createdBy; // Lấy tên người yêu cầu
+                    createdBy = taskEntity.f_createdBy;
                 }
-                
-                // Truyền cả tên công việc và người yêu cầu vào hàm SetData
-                itemScript.SetData(record.f_quantity, record.f_timestamp, taskName, createdBy);
+
+                itemScript.SetData(record.f_quantity, record.f_timestamp, taskName, createdBy, record.f_taskId);
+
+                if (itemScript.itemButton != null)
+                {
+                    string currentTaskId = record.f_taskId;
+                    itemScript.itemButton.onClick.AddListener(() => OnUsageItemClicked?.Invoke(currentTaskId));
+                }
             }
         }
     }
@@ -516,7 +519,7 @@ public class MaterialUIManager
             GameObject.Destroy(child.gameObject);
         }
     }
-    
+
     private void ClearList(Transform parent)
     {
         if (parent == null) return;
@@ -526,4 +529,3 @@ public class MaterialUIManager
         }
     }
 }
-

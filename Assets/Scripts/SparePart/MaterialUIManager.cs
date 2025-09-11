@@ -350,7 +350,7 @@ public class MaterialUIManager
         }
     }
 
-    public void UpdateUsageHistoryUI(List<E_UsageHistory> usageHistory)
+        public void UpdateUsageHistoryUI(List<E_UsageHistory> usageHistory)
     {
         ClearList(_usageHistoryParent);
         foreach (var record in usageHistory)
@@ -359,7 +359,19 @@ public class MaterialUIManager
             UsageHistoryItemUI itemScript = historyItemUI.GetComponent<UsageHistoryItemUI>();
             if (itemScript != null)
             {
-                itemScript.SetData(record.f_quantity, record.f_timestamp);
+                string taskName = "Không rõ";
+                string createdBy = "Không rõ";
+                
+                // Tìm thông tin công việc từ taskId
+                var taskEntity = E_Task.FindEntity(e => e.f_Id == record.f_taskId);
+                if (taskEntity != null)
+                {
+                    taskName = taskEntity.f_name;
+                    createdBy = taskEntity.f_createdBy; // Lấy tên người yêu cầu
+                }
+                
+                // Truyền cả tên công việc và người yêu cầu vào hàm SetData
+                itemScript.SetData(record.f_quantity, record.f_timestamp, taskName, createdBy);
             }
         }
     }
@@ -514,3 +526,4 @@ public class MaterialUIManager
         }
     }
 }
+

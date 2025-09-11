@@ -14,23 +14,23 @@ public class PurchaseHistoryItemUI : MonoBehaviour
     {
         if (poNumberText != null)
         {
-            poNumberText.text = $"PO: {poNumber}";
+            poNumberText.text = $"{poNumber}";
         }
         if (quantityText != null)
         {
-            quantityText.text = $"Số lượng: {quantity}";
+            quantityText.text = $"{quantity}";
         }
         if (supplierText != null)
         {
-            supplierText.text = $"NCC: {supplier}";
+            supplierText.text = $"{supplier}";
         }
         if (timestampText != null)
         {
-            timestampText.text = $"Thời gian: {timestamp.ToString("dd/MM/yyyy HH:mm")}";
+            timestampText.text = $"{timestamp.ToString("dd/MM/yyyy HH:mm")}";
         }
         if (priceText != null)
         {
-            priceText.text = $"Giá: {price}";
+            priceText.text = $"{price}";
         }
     }
 }

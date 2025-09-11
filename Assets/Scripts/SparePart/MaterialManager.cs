@@ -543,11 +543,20 @@ public class MaterialManager : MonoBehaviour
 
     private async void HandleAddMaterialConfirmed(E_SparePart newMaterial)
     {
-        if (_allMaterials.Any(m => m.f_No == newMaterial.f_No))
+        if (_allMaterials.Any(m => m.f_name == newMaterial.f_name))
         {
-            Debug.LogError($"ID vật tư {newMaterial.f_No} đã tồn tại. Vui lòng nhập ID khác.");
+            Debug.LogError($"Tên vật tư '{newMaterial.f_name}' đã tồn tại. Vui lòng nhập tên khác.");
             return;
         }
+
+        // Tự động tạo Material No lớn nhất + 1
+        int newMaterialNo = 1;
+        if (E_SparePart.CountEntities > 0)
+        {
+            newMaterialNo = E_SparePart.FindEntities(e => true).Max(e => e.f_No) + 1;
+        }
+        newMaterial.f_No = newMaterialNo;
+
 
         E_SparePart newLocalEntity = E_SparePart.NewEntity();
         newLocalEntity.f_No = newMaterial.f_No;

@@ -6,7 +6,6 @@ using MySpace;
 
 public class AddMaterialPanelUI : MonoBehaviour
 {
-    public TMP_InputField materialNoInput;
     public TMP_InputField nameInput;
     public TMP_InputField purposeInput;
     public TMP_InputField typeInput;
@@ -20,7 +19,6 @@ public class AddMaterialPanelUI : MonoBehaviour
     public E_SparePart GetMaterialData()
     {
         E_SparePart newMaterial = E_SparePart.NewEntity();
-        newMaterial.f_No = int.TryParse(materialNoInput.text, out int no) ? no : 0;
         newMaterial.f_name = nameInput.text;
         newMaterial.f_Purpose = purposeInput.text;
         newMaterial.f_Type = typeInput.text;
@@ -35,7 +33,6 @@ public class AddMaterialPanelUI : MonoBehaviour
 
     public void ClearInputs()
     {
-        materialNoInput.text = "";
         nameInput.text = "";
         purposeInput.text = "";
         typeInput.text = "";

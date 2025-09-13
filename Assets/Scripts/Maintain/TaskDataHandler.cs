@@ -11,6 +11,7 @@ public class TaskDataHandler
 {
     private readonly FirebaseFirestore _db;
     private readonly string _canvasAppId;
+    private ListenerRegistration _tasksListener;
 
     public event Action<List<Dictionary<string, object>>> OnInProgressTasksChanged;
     public event Action<List<Dictionary<string, object>>> OnFilteredTasksChanged;
@@ -21,6 +22,102 @@ public class TaskDataHandler
     {
         _db = db;
         _canvasAppId = canvasAppId;
+    }
+
+    public void StartListeningForTasks(string filterStatus)
+    {
+        StopListeningForTasks();
+
+        if (_db == null || string.IsNullOrEmpty(FirebaseManager.Instance.userId))
+        {
+            Debug.LogWarning("Firestore DB hoặc ID người dùng chưa có. Không thể lắng nghe công việc.");
+            return;
+        }
+
+        CollectionReference tasksCollectionRef = FirebasePathUtils.GetTasksCollection(_canvasAppId, _db);
+        Query query = tasksCollectionRef.OrderByDescending("lastUpdated");
+        if (filterStatus != TaskConstants.STATUS_ALL)
+        {
+            query = query.WhereEqualTo("status", filterStatus);
+        }
+
+        _tasksListener = query.Listen(snapshot =>
+        {
+            foreach (DocumentChange change in snapshot.GetChanges())
+            {
+                var doc = change.Document;
+                string firestoreDocId = doc.Id;
+                var localTask = E_Task.FindEntity(entity => entity.f_Id == firestoreDocId);
+
+                switch (change.ChangeType)
+                {
+                    case DocumentChange.Type.Added:
+                    case DocumentChange.Type.Modified:
+                        var taskData = doc.ToDictionary();
+                        string content = taskData.TryGetValue("content", out object contentValue) ? contentValue.ToString() : "";
+                        string location = taskData.TryGetValue("location", out object locationValue) ? locationValue.ToString() : "";
+                        string description = taskData.TryGetValue("description", out object descriptionValue) ? descriptionValue.ToString() : "";
+                        string createdBy = taskData.TryGetValue("createdBy", out object createdByValue) ? createdByValue.ToString() : "";
+                        string status = taskData.TryGetValue("status", out object statusValue) ? statusValue.ToString() : TaskConstants.STATUS_PENDING;
+
+                        DateTime taskTimestamp = DateTime.Now;
+                        if (taskData.TryGetValue("lastUpdated", out object lastUpdatedValue) && lastUpdatedValue is Timestamp firebaseTimestamp)
+                        {
+                            taskTimestamp = firebaseTimestamp.ToDateTime();
+                        }
+
+                        List<int> risks = new List<int>();
+                        if (taskData.TryGetValue("risks", out object risksObject) && risksObject is List<object> risksList)
+                        {
+                            foreach (object riskItem in risksList)
+                            {
+                                if (riskItem is long riskIdLong)
+                                {
+                                    risks.Add((int)riskIdLong);
+                                }
+                            }
+                        }
+
+                        if (localTask == null)
+                        {
+                            localTask = E_Task.NewEntity();
+                            localTask.f_Id = firestoreDocId;
+                        }
+
+                        localTask.f_name = content;
+                        localTask.f_location = location;
+                        localTask.f_description = description;
+                        localTask.f_createdBy = createdBy;
+                        localTask.f_status = status;
+                        localTask.f_risks = risks;
+                        localTask.f_lastUpdated = taskTimestamp;
+                        break;
+
+                    case DocumentChange.Type.Removed:
+                        if (localTask != null)
+                        {
+                            localTask.Delete();
+                        }
+                        break;
+                }
+            }
+
+            SaveData.Save();
+            LoadFilteredTasksFromLocal(filterStatus);
+            LoadInProgressTasksFromLocal();
+        });
+
+        Debug.Log($"Đã bắt đầu lắng nghe công việc với bộ lọc: {filterStatus}.");
+    }
+
+    public void StopListeningForTasks()
+    {
+        if (_tasksListener != null)
+        {
+            _tasksListener.Stop();
+            _tasksListener = null;
+            Debug.Log("Đã dừng lắng nghe cập nhật công việc.");
+        }
     }
 
     public void LoadFilteredTasksFromLocal(string filterStatus)
@@ -34,7 +131,7 @@ public class TaskDataHandler
         {
             tasksFromLocal = E_Task.FindEntities(entity => entity.f_status == filterStatus).ToList();
         }
-
+        tasksFromLocal = tasksFromLocal.OrderByDescending(t => t.f_lastUpdated).ToList();
         List<Dictionary<string, object>> tasksAsDictionaries = ConvertTasksToDictionaryList(tasksFromLocal);
         OnFilteredTasksChanged?.Invoke(tasksAsDictionaries);
     }
@@ -42,6 +139,7 @@ public class TaskDataHandler
     public void LoadInProgressTasksFromLocal()
     {
         List<E_Task> inProgressTasks = E_Task.FindEntities(entity => entity.f_status == TaskConstants.STATUS_IN_PROGRESS).ToList();
+        inProgressTasks = inProgressTasks.OrderByDescending(t => t.f_lastUpdated).ToList();
         List<Dictionary<string, object>> tasksAsDictionaries = ConvertTasksToDictionaryList(inProgressTasks);
         OnInProgressTasksChanged?.Invoke(tasksAsDictionaries);
     }

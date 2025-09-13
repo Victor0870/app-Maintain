@@ -58,7 +58,6 @@ public class TaskManager : MonoBehaviour
     private TaskUIManager _taskUIManager;
     private MaterialManager _materialManager;
     private FirebaseToBGDatabaseRiskSynchronizer _riskSynchronizer;
-    private FirebaseToBGDatabaseTaskSynchronizer _taskSynchronizer; // Thêm biến này
 
     private string _currentSelectedTaskId;
     private string _tempNewStatus;
@@ -83,13 +82,6 @@ public class TaskManager : MonoBehaviour
         if (_riskSynchronizer == null)
         {
             Debug.LogError("Thiếu FirebaseToBGDatabaseRiskSynchronizer trong scene.");
-            return;
-        }
-
-        _taskSynchronizer = FindObjectOfType<FirebaseToBGDatabaseTaskSynchronizer>(); // Tìm bộ đồng bộ hóa công việc
-        if (_taskSynchronizer == null)
-        {
-            Debug.LogError("Thiếu FirebaseToBGDatabaseTaskSynchronizer trong scene.");
             return;
         }
 
@@ -118,14 +110,8 @@ public class TaskManager : MonoBehaviour
             Debug.LogError("Không thể đồng bộ hóa dữ liệu rủi ro.");
         }
 
-        // Đồng bộ hóa công việc
-        _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu công việc...");
-        bool successTask = await _taskSynchronizer.SynchronizeTasksFromFirebase();
-        _taskUIManager.HideLoadingIndicator();
-        if (!successTask)
-        {
-            Debug.LogError("Không thể đồng bộ hóa dữ liệu công việc.");
-        }
+        // Tải dữ liệu ban đầu từ BGDatabase và thiết lập trình lắng nghe
+        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
 
         _taskUIManager.InitializeSharedRiskTogglesLabels();
 
@@ -149,10 +135,6 @@ public class TaskManager : MonoBehaviour
         _taskDataHandler.OnInProgressTasksChanged += _taskUIManager.UpdateInProgressTasksUI;
         _taskDataHandler.OnInitialLoadComplete += _taskUIManager.HideLoadingIndicator;
         _taskDataHandler.OnNewTaskAdded += _taskUIManager.ShowNewTaskNotification;
-
-        // Gọi hàm để tải và hiển thị dữ liệu từ BGDatabase thay vì lắng nghe Firebase
-        _taskDataHandler.LoadFilteredTasksFromLocal(TaskConstants.STATUS_ALL);
-        _taskDataHandler.LoadInProgressTasksFromLocal();
     }
 
     void OnDestroy()
@@ -181,9 +163,7 @@ public class TaskManager : MonoBehaviour
             _taskDataHandler.OnFilteredTasksChanged -= _taskUIManager.UpdateFilteredTasksUI;
             _taskDataHandler.OnInProgressTasksChanged -= _taskUIManager.UpdateInProgressTasksUI;
             _taskDataHandler.OnNewTaskAdded -= _taskUIManager.ShowNewTaskNotification;
-            // Dừng lắng nghe Firebase vì chúng ta sẽ sử dụng bộ nhớ cục bộ
-            _taskDataHandler.StopListeningForFilteredTasks();
-            _taskDataHandler.StopListeningForInProgressTasks();
+            _taskDataHandler.StopListeningForTasks();
         }
     }
 
@@ -217,11 +197,8 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
-        _taskUIManager.ClearFilteredTasksUI();
-        _taskDataHandler.LoadFilteredTasksFromLocal(_taskUIManager.GetSelectedStatusFilter());
-        _taskUIManager.ShowLoadingIndicator("Đang tải dữ liệu...");
-        // Không cần tải lại từ Firebase ở đây
-        _taskUIManager.HideLoadingIndicator();
+        _taskDataHandler.StopListeningForTasks();
+        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
     }
 
     private void HandleLoadMoreTasks()
@@ -266,14 +243,6 @@ public class TaskManager : MonoBehaviour
         {
             _taskDataHandler.UpdateTaskStatus(_currentSelectedTaskId, _tempNewStatus);
             _taskUIManager.ShowNotification("Thành công", $"Trạng thái công việc đã được cập nhật thành '{_tempNewStatus}'!");
-
-            if (_tempNewStatus == TaskConstants.STATUS_DONE)
-            {
-                _taskUIManager.CloseTaskDetails();
-            }
-
-            _taskDataHandler.LoadFilteredTasksFromLocal(_taskUIManager.GetSelectedStatusFilter());
-            _taskDataHandler.LoadInProgressTasksFromLocal();
         }
         _tempNewStatus = null;
     }

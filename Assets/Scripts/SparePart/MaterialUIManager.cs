@@ -429,70 +429,72 @@ public class MaterialUIManager
     }
 
     private void DisplayMaterial(E_SparePart materialData, bool isSelectPanel)
-    {
-        GameObject prefabToUse = isSelectPanel ? _materialSelectPanelItemPrefab : _materialItemPrefab;
-        Transform parentToUse = isSelectPanel ? _materialSelectParent : _materialsListParent;
-        if (prefabToUse == null || parentToUse == null)
         {
-            Debug.LogError("Prefab hoặc Parent Transform chưa được gán!");
-            return;
-        }
-
-        GameObject materialUI = GameObject.Instantiate(prefabToUse, parentToUse);
-        MaterialItemUI itemScript = materialUI.GetComponent<MaterialItemUI>();
-        if (itemScript != null)
-        {
-            string name = materialData.f_name;
-            string stock = materialData.f_Stock.ToString();
-            string location = materialData.f_Location;
-            string purpose = materialData.f_Purpose;
-            string category = materialData.f_Category;
-            string type = materialData.f_Type;
-            string materialId = materialData.f_No.ToString();
-
-            itemScript.SetMaterialData(name, stock, location, purpose, category, type);
-            if (isSelectPanel && itemScript.addButton != null)
+            GameObject prefabToUse = isSelectPanel ? _materialSelectPanelItemPrefab : _materialItemPrefab;
+            Transform parentToUse = isSelectPanel ? _materialSelectParent : _materialsListParent;
+            if (prefabToUse == null || parentToUse == null)
             {
-                if (_purchasePanel != null && _purchasePanel.activeSelf)
-                {
-                    itemScript.addButton.onClick.AddListener(() => OnAddMaterialToPurchaseClicked?.Invoke(materialId, 1));
-                }
-                else
-                {
-                    itemScript.addButton.onClick.AddListener(() => OnAddMaterialToTaskClicked?.Invoke(materialId, 1));
-                }
-                itemScript.addButton.interactable = materialData.f_Stock > 0;
+                Debug.LogError("Prefab hoặc Parent Transform chưa được gán!");
+                return;
             }
-            if (!isSelectPanel && itemScript.itemButton != null)
+
+            GameObject materialUI = GameObject.Instantiate(prefabToUse, parentToUse);
+            MaterialItemUI itemScript = materialUI.GetComponent<MaterialItemUI>();
+            if (itemScript != null)
             {
-                itemScript.itemButton.onClick.AddListener(() => OnMaterialItemSelected?.Invoke(materialId));
+                string name = materialData.f_name;
+                string stock = materialData.f_Stock.ToString();
+                string location = materialData.f_Location;
+                string purpose = materialData.f_Purpose;
+                string category = materialData.f_Category;
+                string type = materialData.f_Type;
+                string materialId = materialData.f_No.ToString();
+
+                itemScript.SetMaterialData(name, stock, location, purpose, category, type);
+                if (isSelectPanel && itemScript.addButton != null)
+                {
+                    if (_purchasePanel != null && _purchasePanel.activeSelf)
+                    {
+                        itemScript.addButton.onClick.AddListener(() => OnAddMaterialToPurchaseClicked?.Invoke(materialId, 1));
+                        itemScript.addButton.interactable = true; // Luôn cho phép thêm vào khi ở chế độ mua hàng
+                    }
+                    else // Đây là chế độ sử dụng
+                    {
+                        itemScript.addButton.onClick.AddListener(() => OnAddMaterialToTaskClicked?.Invoke(materialId, 1));
+                        itemScript.addButton.interactable = materialData.f_Stock > 0; // Chỉ cho phép thêm vào khi tồn kho > 0
+                    }
+                }
+                if (!isSelectPanel && itemScript.itemButton != null)
+                {
+                    itemScript.itemButton.onClick.AddListener(() => OnMaterialItemSelected?.Invoke(materialId));
+                }
             }
         }
-    }
 
     private void DisplayMaterialForUsage(string materialId, string quantity)
-    {
-        if (_usageItemPrefab == null || _usageListParent == null)
         {
-            Debug.LogError("Usage Item Prefab hoặc Parent Transform chưa được gán!");
-            return;
+            if (_usageItemPrefab == null || _usageListParent == null)
+            {
+                Debug.LogError("Usage Item Prefab hoặc Parent Transform chưa được gán!");
+                return;
+            }
+
+            var material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
+            if (material == null) return;
+
+            GameObject usageUI = GameObject.Instantiate(_usageItemPrefab, _usageListParent);
+            MaterialUsageItemUI itemScript = usageUI.GetComponent<MaterialUsageItemUI>();
+            if (itemScript != null)
+            {
+                // Corrected line below to include all required parameters
+                itemScript.SetMaterialUsageData(material.f_name, materialId, int.Parse(quantity), material.f_Stock, material.f_Location, material.f_Purpose, material.f_Type);
+                _currentUsageItems[materialId] = itemScript;
+
+                itemScript.OnIncreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
+                itemScript.OnDecreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
+                itemScript.OnRemoveItemRequest += (id, message) => ShowConfirmPanel(message, id);
+            }
         }
-
-        var material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
-        if (material == null) return;
-
-        GameObject usageUI = GameObject.Instantiate(_usageItemPrefab, _usageListParent);
-        MaterialUsageItemUI itemScript = usageUI.GetComponent<MaterialUsageItemUI>();
-        if (itemScript != null)
-        {
-            itemScript.SetMaterialUsageData(material.f_name, materialId, int.Parse(quantity), material.f_Stock);
-            _currentUsageItems[materialId] = itemScript;
-
-            itemScript.OnIncreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
-            itemScript.OnDecreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
-            itemScript.OnRemoveItemRequest += (id, message) => ShowConfirmPanel(message, id);
-        }
-    }
 
     public void UpdateQuantityButtons(string materialId, int newQuantity, int stock)
     {

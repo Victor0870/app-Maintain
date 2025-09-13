@@ -470,58 +470,70 @@ public class TaskUIManager
     }
 
     private void DisplayTask(Dictionary<string, object> taskData, Transform parentTransform, bool isShortDisplay)
-    {
-        if (_taskItemPrefab == null || parentTransform == null)
         {
-            Debug.LogError("Task Item Prefab hoặc Parent Transform chưa được gán!");
-            return;
-        }
-
-        GameObject taskUI = GameObject.Instantiate(_taskItemPrefab, parentTransform);
-
-        TaskItemUI taskItemUIScript = taskUI.GetComponent<TaskItemUI>();
-        if (taskItemUIScript != null)
-        {
-            string content = taskData.TryGetValue("content", out object contentVal) ? contentVal.ToString() : "N/A";
-            string location = taskData.TryGetValue("location", out object locationVal) ? locationVal.ToString() : "N/A";
-            string createdBy = taskData.TryGetValue("createdBy", out object createdByVal) ? createdByVal.ToString() : "N/A";
-            string status = taskData.TryGetValue("status", out object statusVal) ? statusVal.ToString() : TaskConstants.STATUS_PENDING;
-
-            string timestampString = "Đang tải...";
-            if (taskData.TryGetValue("timestamp", out object timestampObject) && timestampObject is Firebase.Firestore.Timestamp)
+            if (_taskItemPrefab == null || parentTransform == null)
             {
-                Firebase.Firestore.Timestamp ts = (Firebase.Firestore.Timestamp)timestampObject;
-                timestampString = isShortDisplay ? ts.ToDateTime().ToString("HH:mm") : ts.ToDateTime().ToString("dd/MM/yyyy HH:mm:ss");
+                Debug.LogError("Task Item Prefab hoặc Parent Transform chưa được gán!");
+                return;
             }
 
-            taskItemUIScript.SetBasicTaskData(content, location, createdBy, timestampString, status);
+            GameObject taskUI = GameObject.Instantiate(_taskItemPrefab, parentTransform);
 
-            if (isShortDisplay)
+            TaskItemUI taskItemUIScript = taskUI.GetComponent<TaskItemUI>();
+            if (taskItemUIScript != null)
             {
-                if (taskItemUIScript.locationText != null) taskItemUIScript.locationText.gameObject.SetActive(false);
-                if (taskItemUIScript.createdByText != null) taskItemUIScript.createdByText.gameObject.SetActive(false);
+                string content = taskData.TryGetValue("content", out object contentVal) ? contentVal.ToString() : "N/A";
+                string location = taskData.TryGetValue("location", out object locationVal) ? locationVal.ToString() : "N/A";
+                string createdBy = taskData.TryGetValue("createdBy", out object createdByVal) ? createdByVal.ToString() : "N/A";
+                string status = taskData.TryGetValue("status", out object statusVal) ? statusVal.ToString() : TaskConstants.STATUS_PENDING;
+
+                string timestampString = "Đang tải...";
+                if (taskData.TryGetValue("lastUpdated", out object lastUpdatedObject))
+                {
+                    DateTime taskTimestamp = DateTime.MinValue;
+                    if (lastUpdatedObject is Firebase.Firestore.Timestamp firebaseTimestamp)
+                    {
+                        taskTimestamp = firebaseTimestamp.ToDateTime();
+                    }
+                    else if (lastUpdatedObject is DateTime localDateTime)
+                    {
+                        taskTimestamp = localDateTime;
+                    }
+
+                    if (taskTimestamp > DateTime.MinValue)
+                    {
+                         timestampString = isShortDisplay ? taskTimestamp.ToString("HH:mm") : taskTimestamp.ToString("dd/MM/yyyy HH:mm:ss");
+                    }
+                }
+
+                taskItemUIScript.SetBasicTaskData(content, location, createdBy, timestampString, status);
+
+                if (isShortDisplay)
+                {
+                    if (taskItemUIScript.locationText != null) taskItemUIScript.locationText.gameObject.SetActive(false);
+                    if (taskItemUIScript.createdByText != null) taskItemUIScript.createdByText.gameObject.SetActive(false);
+                }
+                else
+                {
+                    if (taskItemUIScript.locationText != null) taskItemUIScript.locationText.gameObject.SetActive(true);
+                    if (taskItemUIScript.createdByText != null) taskItemUIScript.createdByText.gameObject.SetActive(true);
+                }
+
+                if (taskItemUIScript.taskItemButton != null)
+                {
+                    var currentTaskData = taskData;
+                    taskItemUIScript.taskItemButton.onClick.AddListener(() => OnTaskItemClicked?.Invoke(currentTaskData));
+                }
+                else
+                {
+                    Debug.LogWarning("Task Item Button (taskItemButton) not assigned on TaskItemUI prefab. Cannot show details.");
+                }
             }
             else
             {
-                if (taskItemUIScript.locationText != null) taskItemUIScript.locationText.gameObject.SetActive(true);
-                if (taskItemUIScript.createdByText != null) taskItemUIScript.createdByText.gameObject.SetActive(true);
-            }
-
-            if (taskItemUIScript.taskItemButton != null)
-            {
-                var currentTaskData = taskData;
-                taskItemUIScript.taskItemButton.onClick.AddListener(() => OnTaskItemClicked?.Invoke(currentTaskData));
-            }
-            else
-            {
-                Debug.LogWarning("Task Item Button (taskItemButton) not assigned on TaskItemUI prefab. Cannot show details.");
+                Debug.LogWarning("TaskItemUI script không tìm thấy trên prefab. Đảm bảo bạn đã gắn nó vào prefab.");
             }
         }
-        else
-        {
-            Debug.LogWarning("TaskItemUI script không tìm thấy trên prefab. Đảm bảo bạn đã gắn nó vào prefab.");
-        }
-    }
 
     public void ShowConfirmPopup(string message)
     {

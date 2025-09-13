@@ -10372,7 +10372,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c062a6685b2dcd34887541595dacd4b5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  materialNoInput: {fileID: 0}
   nameInput: {fileID: 863675304}
   purposeInput: {fileID: 1292602897}
   typeInput: {fileID: 418430484}
@@ -17990,8 +17989,8 @@ RectTransform:
   - {fileID: 103466293}
   - {fileID: 1872101555}
   - {fileID: 1890857947}
-  - {fileID: 1449677651}
   - {fileID: 1228794351}
+  - {fileID: 1449677651}
   - {fileID: 1890704246}
   - {fileID: 1574420238}
   - {fileID: 1412632384}
@@ -20203,6 +20202,7 @@ MonoBehaviour:
   synchronizerToFirebase: {fileID: 346930285}
   materialUsageSynchronizer: {fileID: 1141827410}
   purchaseSynchronizer: {fileID: 903049886}
+  taskManager: {fileID: 1760547236}
 --- !u!4 &1908934929
 Transform:
   m_ObjectHideFlags: 0
@@ -22010,7 +22010,6 @@ SceneRoots:
   - {fileID: 1725930107}
   - {fileID: 42515715}
   - {fileID: 347417981}
-  - {fileID: 1760547237}
   - {fileID: 641204529}
   - {fileID: 346930284}
   - {fileID: 305981622}
@@ -22020,3 +22019,4 @@ SceneRoots:
   - {fileID: 1505269562}
   - {fileID: 1141827411}
   - {fileID: 903049887}
+  - {fileID: 1760547237}

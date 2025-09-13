@@ -715,6 +715,13 @@ public class MaterialManager : MonoBehaviour
         var taskEntity = E_Task.FindEntity(entity => entity.f_Id == taskId);
         if (taskEntity != null)
         {
+            List<object> risksList = new List<object>();
+            if (taskEntity.f_risks != null)
+            {
+                // Chỉ thực hiện Select nếu danh sách không phải là null
+                risksList = taskEntity.f_risks.Select(id => (object)(long)id).ToList();
+            }
+
             var taskData = new System.Collections.Generic.Dictionary<string, object>
             {
                 { "id", taskEntity.f_Id },
@@ -723,11 +730,16 @@ public class MaterialManager : MonoBehaviour
                 { "description", taskEntity.f_description },
                 { "createdBy", taskEntity.f_createdBy },
                 { "status", taskEntity.f_status },
-                { "risks", taskEntity.f_risks.Select(id => (object)(long)id).ToList() },
+                { "risks", risksList },
                 { "timestamp", Firebase.Firestore.Timestamp.FromDateTime(taskEntity.f_lastUpdated) }
             };
-            taskManager.HandleTaskItemClick(taskData);
-            _materialUIManager.HideMaterialDetailsPanel();
+
+            // Kiểm tra xem taskManager có null không trước khi gọi phương thức
+            if (taskManager != null)
+            {
+                taskManager.HandleTaskItemClick(taskData);
+                _materialUIManager.HideMaterialDetailsPanel();
+            }
         }
     }
 }

@@ -388,6 +388,10 @@ MonoBehaviour:
   quantityInput: {fileID: 8515546590770844990}
   increaseButton: {fileID: 4377983579488996328}
   decreaseButton: {fileID: 693150306552819455}
+  oldQuantity: 0
+  locationText: {fileID: 5394948232103855278}
+  purposeText: {fileID: 1697216377624157957}
+  typeText: {fileID: 955422417894544884}
 --- !u!1 &1857979737025916206
 GameObject:
   m_ObjectHideFlags: 0

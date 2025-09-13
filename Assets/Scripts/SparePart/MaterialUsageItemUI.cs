@@ -10,6 +10,10 @@ public class MaterialUsageItemUI : MonoBehaviour
     public Button increaseButton;
     public Button decreaseButton;
     public int oldQuantity;
+    // Thêm các biến mới để hiển thị thông tin
+    public TextMeshProUGUI locationText;
+    public TextMeshProUGUI purposeText;
+    public TextMeshProUGUI typeText;
 
     private string _materialId;
     private int _stock;
@@ -22,15 +26,20 @@ public class MaterialUsageItemUI : MonoBehaviour
     public event Action<string, int> OnDecreaseQuantity;
     public event Action<string, string> OnRemoveItemRequest;
 
-    public void SetMaterialUsageData(string name, string id, int quantity, int stock)
+    public void SetMaterialUsageData(string name, string id, int quantity, int stock, string location, string purpose, string type)
     {
         materialNameText.text = name;
         _materialId = id;
         _stock = stock;
         quantityInput.text = quantity.ToString();
-         oldQuantity = quantity;
+        oldQuantity = quantity;
         increaseButton.onClick.AddListener(IncreaseQuantity);
         decreaseButton.onClick.AddListener(DecreaseQuantity);
+
+        // Gán giá trị cho các trường mới
+        if (locationText != null) locationText.text = location;
+        if (purposeText != null) purposeText.text = purpose;
+        if (typeText != null) typeText.text = type;
 
         UpdateButtons(quantity, stock);
     }

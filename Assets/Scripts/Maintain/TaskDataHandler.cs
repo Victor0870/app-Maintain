@@ -24,7 +24,7 @@ public class TaskDataHandler
         _canvasAppId = canvasAppId;
     }
 
-    public void StartListeningForTasks(string filterStatus)
+    public void StartListeningForTasks()
     {
         StopListeningForTasks();
 
@@ -36,10 +36,6 @@ public class TaskDataHandler
 
         CollectionReference tasksCollectionRef = FirebasePathUtils.GetTasksCollection(_canvasAppId, _db);
         Query query = tasksCollectionRef.OrderByDescending("lastUpdated");
-        if (filterStatus != TaskConstants.STATUS_ALL)
-        {
-            query = query.WhereEqualTo("status", filterStatus);
-        }
 
         _tasksListener = query.Listen(snapshot =>
         {
@@ -103,11 +99,11 @@ public class TaskDataHandler
             }
 
             SaveData.Save();
-            LoadFilteredTasksFromLocal(filterStatus);
+            LoadAndNotifyFilteredTasks();
             LoadInProgressTasksFromLocal();
         });
 
-        Debug.Log($"Đã bắt đầu lắng nghe công việc với bộ lọc: {filterStatus}.");
+        Debug.Log("Đã bắt đầu lắng nghe tất cả công việc.");
     }
 
     public void StopListeningForTasks()
@@ -118,6 +114,25 @@ public class TaskDataHandler
             _tasksListener = null;
             Debug.Log("Đã dừng lắng nghe cập nhật công việc.");
         }
+    }
+
+    private void LoadAndNotifyFilteredTasks()
+    {
+        // Giờ đây, phương thức này được gọi bởi listener sau khi BGDatabase được cập nhật
+        // Nó sẽ lấy dữ liệu đã được đồng bộ hóa cục bộ và gửi đi để hiển thị.
+        string filterStatus = TaskConstants.STATUS_ALL; // Giả sử bộ lọc mặc định
+        List<E_Task> tasksFromLocal;
+        if (filterStatus == TaskConstants.STATUS_ALL)
+        {
+            tasksFromLocal = E_Task.FindEntities(entity => true).ToList();
+        }
+        else
+        {
+            tasksFromLocal = E_Task.FindEntities(entity => entity.f_status == filterStatus).ToList();
+        }
+        tasksFromLocal = tasksFromLocal.OrderByDescending(t => t.f_lastUpdated).ToList();
+        List<Dictionary<string, object>> tasksAsDictionaries = ConvertTasksToDictionaryList(tasksFromLocal);
+        OnFilteredTasksChanged?.Invoke(tasksAsDictionaries);
     }
 
     public void LoadFilteredTasksFromLocal(string filterStatus)

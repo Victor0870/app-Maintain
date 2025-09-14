@@ -111,7 +111,7 @@ public class TaskManager : MonoBehaviour
         }
 
         // Tải dữ liệu ban đầu từ BGDatabase và thiết lập trình lắng nghe
-        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+        _taskDataHandler.StartListeningForTasks();
 
         _taskUIManager.InitializeSharedRiskTogglesLabels();
 
@@ -197,8 +197,8 @@ public class TaskManager : MonoBehaviour
 
     private void HandleStatusFilterChange(int index)
     {
-        _taskDataHandler.StopListeningForTasks();
-        _taskDataHandler.StartListeningForTasks(_taskUIManager.GetSelectedStatusFilter());
+       _taskDataHandler.LoadFilteredTasksFromLocal(_taskUIManager.GetSelectedStatusFilter());
+       _taskDataHandler.LoadInProgressTasksFromLocal();
     }
 
     private void HandleLoadMoreTasks()

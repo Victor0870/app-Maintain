@@ -46,13 +46,13 @@ public class MaterialManager : MonoBehaviour
     [Header("UI Elements - Filters")]
     public TMP_Dropdown typeFilterDropdown;
     public TMP_Dropdown locationFilterDropdown;
-    public TMP_Dropdown categoryFilterDropdown;
+    public TMP_Dropdown purposeFilterDropdown; // ĐÃ SỬA: Tên biến đã được thay đổi
 
     [Header("UI Elements - Select Panel Filters")]
     public TMP_InputField selectSearchInputField;
     public TMP_Dropdown selectTypeFilterDropdown;
     public TMP_Dropdown selectLocationFilterDropdown;
-    public TMP_Dropdown selectCategoryFilterDropdown;
+    public TMP_Dropdown selectPurposeFilterDropdown; // ĐÃ SỬA: Tên biến đã được thay đổi
 
     [Header("UI Elements - Usage Panel")]
     public Transform usageListParent;
@@ -144,9 +144,9 @@ public class MaterialManager : MonoBehaviour
 
         _materialUIManager = new MaterialUIManager(
             sparePartListPanel, materialSelectPanel, materialsListParent, materialSelectParent, materialItemPrefab, materialSelectPanelItemPrefab,
-            closeListButton, searchInputField, typeFilterDropdown, locationFilterDropdown, categoryFilterDropdown,
+            closeListButton, searchInputField, typeFilterDropdown, locationFilterDropdown, purposeFilterDropdown, // ĐÃ SỬA: Tên biến
             materialUsagePanel, usageListParent, usageItemPrefab, closeUsagePanelButton, addNewUsageButton, confirmUsageButton,
-            selectSearchInputField, selectTypeFilterDropdown, selectLocationFilterDropdown, selectCategoryFilterDropdown,
+            selectSearchInputField, selectTypeFilterDropdown, selectLocationFilterDropdown, selectPurposeFilterDropdown, // ĐÃ SỬA: Tên biến
             confirmPanel, confirmPopupText, confirmYesButton, confirmNoButton, purchasePanel,
             materialDetailsPanel, usageHistoryParent, purchaseHistoryParent, usageHistoryItemPrefab, purchaseHistoryItemPrefab, closeDetailsButton,
             addMaterialPanel, addMaterialPanelUI.closeButton, addMaterialPanelUI.saveButton
@@ -314,24 +314,24 @@ public class MaterialManager : MonoBehaviour
 
         var types = new HashSet<string>();
         var locations = new HashSet<string>();
-        var categories = new HashSet<string>();
+        var purposes = new HashSet<string>(); // ĐÃ SỬA: Biến mới
 
         foreach (var material in _allMaterials)
         {
             types.Add(material.f_Type);
             locations.Add(material.f_Location);
-            categories.Add(material.f_Category);
+            purposes.Add(material.f_Purpose); // ĐÃ SỬA: Lấy dữ liệu từ f_Purpose
         }
 
         if (_materialUIManager != null)
         {
             _materialUIManager.UpdateFilterDropdown(typeFilterDropdown, types);
             _materialUIManager.UpdateFilterDropdown(locationFilterDropdown, locations);
-            _materialUIManager.UpdateFilterDropdown(categoryFilterDropdown, categories);
+            _materialUIManager.UpdateFilterDropdown(purposeFilterDropdown, purposes); // ĐÃ SỬA: Cập nhật dropdown mới
 
             _materialUIManager.UpdateFilterDropdown(selectTypeFilterDropdown, types);
             _materialUIManager.UpdateFilterDropdown(selectLocationFilterDropdown, locations);
-            _materialUIManager.UpdateFilterDropdown(selectCategoryFilterDropdown, categories);
+            _materialUIManager.UpdateFilterDropdown(selectPurposeFilterDropdown, purposes); // ĐÃ SỬA: Cập nhật dropdown mới
         }
     }
 
@@ -520,7 +520,7 @@ public class MaterialManager : MonoBehaviour
         }
     }
 
-    private void HandleSearchOrFilterChanged(string searchTerm, string type, string location, string category)
+    private void HandleSearchOrFilterChanged(string searchTerm, string type, string location, string purpose) // ĐÃ SỬA: Thay đổi tham số
     {
         List<E_SparePart> searchResults = new List<E_SparePart>();
         string lowerSearchTerm = searchTerm.ToLower();
@@ -528,11 +528,12 @@ public class MaterialManager : MonoBehaviour
         foreach (var material in _allMaterials)
         {
             bool matchesSearch = string.IsNullOrEmpty(lowerSearchTerm) || material.f_name.ToLower().Contains(lowerSearchTerm);
-            bool matchesType = string.IsNullOrEmpty(type) || material.f_Type == type;
-            bool matchesLocation = string.IsNullOrEmpty(location) || material.f_Location == location;
-            bool matchesCategory = string.IsNullOrEmpty(category) || material.f_Category == category;
+            // ĐÃ SỬA: Thêm điều kiện kiểm tra "Tất cả" cho các bộ lọc
+            bool matchesType = type == "Tất cả" || material.f_Type == type;
+            bool matchesLocation = location == "Tất cả" || material.f_Location == location;
+            bool matchesPurpose = purpose == "Tất cả" || material.f_Purpose == purpose;
 
-            if (matchesSearch && matchesType && matchesLocation && matchesCategory)
+            if (matchesSearch && matchesType && matchesLocation && matchesPurpose)
             {
                 searchResults.Add(material);
             }

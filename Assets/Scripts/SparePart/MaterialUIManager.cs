@@ -21,12 +21,12 @@ public class MaterialUIManager
 
     private TMP_Dropdown _typeFilterDropdown;
     private TMP_Dropdown _locationFilterDropdown;
-    private TMP_Dropdown _categoryFilterDropdown;
+    private TMP_Dropdown _purposeFilterDropdown; // ĐÃ SỬA: Tên biến đã được thay đổi
 
     private TMP_InputField _selectSearchInputField;
     private TMP_Dropdown _selectTypeFilterDropdown;
     private TMP_Dropdown _selectLocationFilterDropdown;
-    private TMP_Dropdown _selectCategoryFilterDropdown;
+    private TMP_Dropdown _selectPurposeFilterDropdown; // ĐÃ SỬA: Tên biến đã được thay đổi
 
     private GameObject _materialUsagePanel;
     private Transform _usageListParent;
@@ -80,7 +80,7 @@ public class MaterialUIManager
         TMP_InputField searchInputField,
         TMP_Dropdown typeFilterDropdown,
         TMP_Dropdown locationFilterDropdown,
-        TMP_Dropdown categoryFilterDropdown,
+        TMP_Dropdown purposeFilterDropdown, // ĐÃ SỬA: Thêm tham số mới
         GameObject materialUsagePanel,
         Transform usageListParent,
         GameObject usageItemPrefab,
@@ -90,7 +90,7 @@ public class MaterialUIManager
         TMP_InputField selectSearchInputField,
         TMP_Dropdown selectTypeFilterDropdown,
         TMP_Dropdown selectLocationFilterDropdown,
-        TMP_Dropdown selectCategoryFilterDropdown,
+        TMP_Dropdown selectPurposeFilterDropdown, // ĐÃ SỬA: Thêm tham số mới
         GameObject confirmPanel,
         TextMeshProUGUI confirmPopupText,
         Button confirmYesButton,
@@ -116,7 +116,7 @@ public class MaterialUIManager
         _searchInputField = searchInputField;
         _typeFilterDropdown = typeFilterDropdown;
         _locationFilterDropdown = locationFilterDropdown;
-        _categoryFilterDropdown = categoryFilterDropdown;
+        _purposeFilterDropdown = purposeFilterDropdown; // ĐÃ SỬA: Gán biến mới
         _materialUsagePanel = materialUsagePanel;
         _usageListParent = usageListParent;
         _usageItemPrefab = usageItemPrefab;
@@ -128,7 +128,7 @@ public class MaterialUIManager
         _selectSearchInputField = selectSearchInputField;
         _selectTypeFilterDropdown = selectTypeFilterDropdown;
         _selectLocationFilterDropdown = selectLocationFilterDropdown;
-        _selectCategoryFilterDropdown = selectCategoryFilterDropdown;
+        _selectPurposeFilterDropdown = selectPurposeFilterDropdown; // ĐÃ SỬA: Gán biến mới
 
         _confirmPanel = confirmPanel;
         _confirmPopupText = confirmPopupText;
@@ -166,7 +166,7 @@ public class MaterialUIManager
         if (_searchInputField != null) _searchInputField.onValueChanged.AddListener(value => TriggerSearchOrFilter());
         if (_typeFilterDropdown != null) _typeFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
         if (_locationFilterDropdown != null) _locationFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
-        if (_categoryFilterDropdown != null) _categoryFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
+        if (_purposeFilterDropdown != null) _purposeFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter()); // ĐÃ SỬA: Gắn listener vào dropdown mới
         if (_closeUsagePanelButton != null) _closeUsagePanelButton.onClick.AddListener(() => OnCloseUsagePanelClicked?.Invoke());
         if (_addNewUsageButton != null) _addNewUsageButton.onClick.AddListener(() => OnAddNewUsageClicked?.Invoke());
         if (_confirmUsageButton != null) _confirmUsageButton.onClick.AddListener(() => OnConfirmUsageClicked?.Invoke());
@@ -174,7 +174,7 @@ public class MaterialUIManager
         if (_selectSearchInputField != null) _selectSearchInputField.onValueChanged.AddListener(value => TriggerSearchOrFilter());
         if (_selectTypeFilterDropdown != null) _selectTypeFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
         if (_selectLocationFilterDropdown != null) _selectLocationFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
-        if (_selectCategoryFilterDropdown != null) _selectCategoryFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter());
+        if (_selectPurposeFilterDropdown != null) _selectPurposeFilterDropdown.onValueChanged.AddListener(index => TriggerSearchOrFilter()); // ĐÃ SỬA: Gắn listener vào dropdown mới
 
         if (_confirmNoButton != null) _confirmNoButton.onClick.AddListener(HideConfirmPanel);
 
@@ -214,34 +214,41 @@ public class MaterialUIManager
         string searchTerm;
         string type;
         string location;
-        string category;
+        string purpose; // ĐÃ SỬA: Tên biến mới
 
         if (_sparePartListPanel.activeSelf)
         {
             searchTerm = _searchInputField.text;
             type = _typeFilterDropdown.options[_typeFilterDropdown.value].text;
             location = _locationFilterDropdown.options[_locationFilterDropdown.value].text;
-            category = _categoryFilterDropdown.options[_categoryFilterDropdown.value].text;
+            purpose = _purposeFilterDropdown.options[_purposeFilterDropdown.value].text; // ĐÃ SỬA: Lấy giá trị từ dropdown mới
         }
         else if (_materialSelectPanel.activeSelf)
         {
             searchTerm = _selectSearchInputField.text;
             type = _selectTypeFilterDropdown.options[_selectTypeFilterDropdown.value].text;
             location = _selectLocationFilterDropdown.options[_selectLocationFilterDropdown.value].text;
-            category = _selectCategoryFilterDropdown.options[_selectCategoryFilterDropdown.value].text;
+            purpose = _selectPurposeFilterDropdown.options[_selectPurposeFilterDropdown.value].text; // ĐÃ SỬA: Lấy giá trị từ dropdown mới
         }
         else
         {
             return;
         }
 
-        OnSearchOrFilterChanged?.Invoke(searchTerm, type, location, category);
+        OnSearchOrFilterChanged?.Invoke(searchTerm, type, location, purpose); // ĐÃ SỬA: Thay đổi tham số cuối
     }
 
     public void UpdateFilterDropdown(TMP_Dropdown dropdown, HashSet<string> values)
     {
+        // ĐÃ SỬA: Thêm kiểm tra null
+        if (dropdown == null)
+        {
+            Debug.LogError("Dropdown reference is null. Please assign it in the Inspector.");
+            return;
+        }
+
         dropdown.ClearOptions();
-        var options = new List<string> { "" };
+        var options = new List<string> { "Tất cả" };
         options.AddRange(values);
         dropdown.AddOptions(options);
     }
@@ -259,6 +266,12 @@ public class MaterialUIManager
             if (_materialSelectPanel != null) _materialSelectPanel.SetActive(false);
             if (_materialDetailsPanel != null) _materialDetailsPanel.SetActive(false);
             if (_addMaterialPanel != null) _addMaterialPanel.SetActive(false);
+
+            // THÊM: Reset các bộ lọc khi mở panel
+            if (_searchInputField != null) _searchInputField.text = "";
+            if (_typeFilterDropdown != null) _typeFilterDropdown.value = 0;
+            if (_locationFilterDropdown != null) _locationFilterDropdown.value = 0;
+            if (_purposeFilterDropdown != null) _purposeFilterDropdown.value = 0;
         }
     }
 
@@ -294,6 +307,12 @@ public class MaterialUIManager
         {
             _materialSelectPanel.SetActive(true);
             if (_sparePartListPanel != null) _sparePartListPanel.SetActive(false);
+
+            // THÊM: Reset các bộ lọc khi mở panel
+            if (_selectSearchInputField != null) _selectSearchInputField.text = "";
+            if (_selectTypeFilterDropdown != null) _selectTypeFilterDropdown.value = 0;
+            if (_selectLocationFilterDropdown != null) _selectLocationFilterDropdown.value = 0;
+            if (_selectPurposeFilterDropdown != null) _selectPurposeFilterDropdown.value = 0;
         }
     }
 
@@ -472,29 +491,28 @@ public class MaterialUIManager
         }
 
     private void DisplayMaterialForUsage(string materialId, string quantity)
+    {
+        if (_usageItemPrefab == null || _usageListParent == null)
         {
-            if (_usageItemPrefab == null || _usageListParent == null)
-            {
-                Debug.LogError("Usage Item Prefab hoặc Parent Transform chưa được gán!");
-                return;
-            }
-
-            var material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
-            if (material == null) return;
-
-            GameObject usageUI = GameObject.Instantiate(_usageItemPrefab, _usageListParent);
-            MaterialUsageItemUI itemScript = usageUI.GetComponent<MaterialUsageItemUI>();
-            if (itemScript != null)
-            {
-                // Corrected line below to include all required parameters
-                itemScript.SetMaterialUsageData(material.f_name, materialId, int.Parse(quantity), material.f_Stock, material.f_Location, material.f_Purpose, material.f_Type);
-                _currentUsageItems[materialId] = itemScript;
-
-                itemScript.OnIncreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
-                itemScript.OnDecreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
-                itemScript.OnRemoveItemRequest += (id, message) => ShowConfirmPanel(message, id);
-            }
+            Debug.LogError("Usage Item Prefab hoặc Parent Transform chưa được gán!");
+            return;
         }
+
+        var material = E_SparePart.FindEntity(entity => entity.f_No.ToString() == materialId);
+        if (material == null) return;
+
+        GameObject usageUI = GameObject.Instantiate(_usageItemPrefab, _usageListParent);
+        MaterialUsageItemUI itemScript = usageUI.GetComponent<MaterialUsageItemUI>();
+        if (itemScript != null)
+        {
+            itemScript.SetMaterialUsageData(material.f_name, materialId, int.Parse(quantity), material.f_Stock, material.f_Location, material.f_Purpose, material.f_Type);
+            _currentUsageItems[materialId] = itemScript;
+
+            itemScript.OnIncreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
+            itemScript.OnDecreaseQuantity += (id, newQ) => OnQuantityChanged?.Invoke(id, newQ, int.Parse(quantity));
+            itemScript.OnRemoveItemRequest += (id, message) => ShowConfirmPanel(message, id);
+        }
+    }
 
     public void UpdateQuantityButtons(string materialId, int newQuantity, int stock)
     {
